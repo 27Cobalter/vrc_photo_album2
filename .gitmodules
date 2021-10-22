@@ -1,0 +1,3 @@
+[submodule "submodule/vrc_photo_streamer"]
+	path = submodule/vrc_photo_streamer
+	url = https://github.com/27Cobalter/vrc_photo_streamer
