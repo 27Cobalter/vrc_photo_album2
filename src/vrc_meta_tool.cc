@@ -187,18 +187,23 @@ void meta_tool::read(filesystem::path path) {
   clear_users();
 
   chunk_util util(path);
-  auto chunks = util.read();
-  for (auto chunk : *chunks) {
-    auto [type, data] = chunk;
-    if (type == "vrCd") {
-      set_date(data);
-    } else if (type == "vrCp") {
-      set_photographer(data);
-    } else if (type == "vrCw") {
-      set_world(data);
-    } else if (type == "vrCu") {
-      add_user(data);
+  try {
+    auto chunks = util.read();
+    for (auto chunk : *chunks) {
+      auto [type, data] = chunk;
+      if (type == "vrCd") {
+        set_date(data);
+      } else if (type == "vrCp") {
+        set_photographer(data);
+      } else if (type == "vrCw") {
+        set_world(data);
+      } else if (type == "vrCu") {
+        add_user(data);
+      }
     }
+  } catch (...) {
+    std::cout << "read png exception" << std::endl;
+    return;
   }
 }
 } // namespace vrc_photo_album2::meta_tool
