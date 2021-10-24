@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.18)
 project(vrc_photo_album2)
 
 set(CMAKE_CXX_STANDARD 20)
-set(CMAKE_CXX_COMPILER /usr/bin/clang++)
+set(CMAKE_CXX_COMPILER /usr/bin/g++)
 
 set(CMAKE_CXX_FLAGS
     "${CMAKE_CXX_FLAGS} -O2 -pipe -fstack-protector-strong -fno-plt -fno-omit-frame-pointer"
@@ -24,26 +24,6 @@ find_package(OpenCV REQUIRED)
 find_package(PkgConfig REQUIRED)
 find_package(Threads REQUIRED)
 include_directories(${PROJECT_SOURCE_DIR}/submodule)
-
-execute_process(
-  COMMAND Magick++-config --cppflags
-  OUTPUT_STRIP_TRAILING_WHITESPACE
-  OUTPUT_VARIABLE GMXX_CPP_FLAGS)
-execute_process(
-  COMMAND Magick++-config --cxxflags
-  OUTPUT_STRIP_TRAILING_WHITESPACE
-  OUTPUT_VARIABLE GMXX_CXX_FLAGS)
-execute_process(
-  COMMAND Magick++-config --ldflags
-  OUTPUT_STRIP_TRAILING_WHITESPACE
-  OUTPUT_VARIABLE GMXX_LD_FLAGS)
-execute_process(
-  COMMAND Magick++-config --libs
-  OUTPUT_STRIP_TRAILING_WHITESPACE
-  OUTPUT_VARIABLE GMXX_LIBS)
-
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${GMXX_CPP_FLAGS} ${GMXX_CXX_FLAGS}")
-set(LINK_FLAGS "${LINK_FLAGS} ${GMXX_LD_FLAGS}")
 
 set(LINK_FLAGS "${LINK_FLAGS} -lboost_thread")
 
