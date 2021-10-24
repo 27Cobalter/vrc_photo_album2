@@ -9,6 +9,7 @@
 - opencv4
 - openmp
 - ttf-migu（フォント）
+- ffmpeg (shellで実行できること)
 
 ## ビルド&実行
 ```sh
