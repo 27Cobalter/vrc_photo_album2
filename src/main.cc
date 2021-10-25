@@ -1,5 +1,3 @@
-#include "vrc_meta_tool.h"
-
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
@@ -13,10 +11,17 @@
 #include <opencv2/imgcodecs.hpp>
 #include <opencv2/imgproc.hpp>
 
+#include "hls_helper.h"
 #include "image_generator.h"
+#include "vrc_meta_tool.h"
 
 namespace filesystem = std::filesystem;
 using namespace vrc_photo_album2;
+
+template <typename Iterator>
+inline int n_or_end(Iterator it, Iterator end, int n) {
+  return std::min(static_cast<int>(std::distance(it, end)), n);
+}
 
 auto main(int argc, char** argv) -> int {
   cv::CommandLineParser parser(
@@ -34,8 +39,7 @@ auto main(int argc, char** argv) -> int {
   std::cout << "inputdir: " << input_dir << ", output_dir" << out_dir << std::endl;
 
   std::set<std::filesystem::path> resource_paths;
-  // メモリリソース削減するならfreetypeを共有化する
-  // image_generator generator(output_size);
+  const int tile_size = 9;
 
   // パス取得部分
   for (const filesystem::directory_entry& x : filesystem::directory_iterator(input_dir)) {
@@ -45,15 +49,35 @@ auto main(int argc, char** argv) -> int {
     }
   }
 
+  // 重複チェック
+  hls_manager manager(video_dir.string() + "vrc_photo_album.m3u8");
+  int update_index = 0;
+  auto it          = resource_paths.begin();
+  for (; update_index < (resource_paths.size() + tile_size - 1) / tile_size;) {
+    if (!manager.next_segment()) {
+      break;
+    }
+    auto end = std::next(it, n_or_end(it, resource_paths.end(), tile_size) - 1);
+    if (manager.compare_start(it->filename()) && manager.compare_end(end->filename())) {
+      std::cout << update_index << ". " << it->filename() << " - " << end->filename()
+                << " is not changed." << std::endl;
+      update_index++;
+      it = std::next(end, 1);
+    } else {
+      std::cout << update_index << ". " << it->filename() << " - " << end->filename()
+                << " is changed." << std::endl;
+      break;
+    }
+  }
+  std::cout << "update from " << update_index << "th block" << std::endl;
+
   // 画像生成部分
-  const int tile_size = 9;
 // #pragma omp parallel for num_threads(1)
 #pragma omp parallel for
-  for (int i = 0; i < (resource_paths.size() + tile_size - 1) / tile_size; i++) {
+  for (int i = update_index; i < (resource_paths.size() + tile_size - 1) / tile_size; i++) {
     const int index = i * tile_size;
     auto it         = std::next(resource_paths.begin(), index);
-    std::vector<cv::Mat> images(
-        std::min(static_cast<int>(std::distance(it, resource_paths.end())), tile_size));
+    std::vector<cv::Mat> images(n_or_end(it, resource_paths.end(), tile_size));
     std::vector<cv::Mat> dsts(images.size() + 1);
 #pragma omp parallel for
     for (int j = 0; j < images.size(); j++) {
@@ -65,7 +89,6 @@ auto main(int argc, char** argv) -> int {
 #pragma omp parallel for
     for (int j = 0; j < images.size(); j++) {
       auto id = std::next(it, j);
-      // std::cout << id->filename().string() << std::endl;
       image_generator generator(output_size);
       generator.generate_single(*id, images[j], dsts[j + 1]);
       std::string log(std::string("") + "generate: " + output_dir.string() +
@@ -77,7 +100,6 @@ auto main(int argc, char** argv) -> int {
 
 #pragma omp parallel for
     for (int j = 0; j < dsts.size(); j++) {
-      auto id = std::next(it, j);
       cv::imwrite(output_dir.string() + (boost::format("img-%05d_%05d.png") % i % (j)).str(),
                   dsts[j]);
       dsts[j].release();
@@ -86,7 +108,7 @@ auto main(int argc, char** argv) -> int {
 
   // 10枚毎のブロック生成部分
 #pragma omp parallel for
-  for (int i = 0; i < (resource_paths.size() + 8) / 9; i++) {
+  for (int i = update_index; i < (resource_paths.size() + tile_size - 1) / tile_size; i++) {
     std::string command = (boost::format(std::string("") +
                                          "ffmpeg -framerate 10 "
                                          "-i " +
@@ -112,8 +134,11 @@ auto main(int argc, char** argv) -> int {
          "#EXT-X-MEDIA-SEQUENCE:0\n"
          "#EXT-X-PLAYLIST-TYPE:EVENT\n\n";
   auto path = resource_paths.begin();
-  for (int i = 0; i < (resource_paths.size() + 8) / 9; i++, path = std::next(path, 9)) {
-    ofs << boost::format("#%s") % path->filename().string() << "\n"
+  for (int i = 0; i < (resource_paths.size() + tile_size - 1) / tile_size;
+       i++, std::advance(path, tile_size)) {
+    auto end = std::next(path, n_or_end(path, resource_paths.end(), tile_size) - 1);
+    ofs << boost::format("#src_start=%s") % path->filename().string() << "\n"
+        << boost::format("#src_end=%s") % end->filename().string() << "\n"
         << "#EXT-X-DISCONTINUITY\n"
         << "#EXTINF:1.000000\n"
         << boost::format("video-%05d_00000.ts\n") % i;
