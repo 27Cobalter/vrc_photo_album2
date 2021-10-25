@@ -104,13 +104,10 @@ auto main(int argc, char** argv) -> int {
                   dsts[j]);
       dsts[j].release();
     }
-  }
 
-  // 10枚毎のブロック生成部分
-#pragma omp parallel for
-  for (int i = update_index; i < (resource_paths.size() + tile_size - 1) / tile_size; i++) {
+    // 10枚毎のブロック生成部分
     std::string command = (boost::format(std::string("") +
-                                         "ffmpeg -framerate 10 "
+                                         "ffmpeg -loglevel error -framerate 10 "
                                          "-i " +
                                          output_dir.string() +
                                          "img-%05d_%s.png -vcodec libx264 "
