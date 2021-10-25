@@ -202,6 +202,10 @@ void meta_tool::read(filesystem::path path) {
       }
     }
   } catch (...) {
+    set_date(std::nullopt);
+    set_photographer(std::nullopt);
+    set_world(std::nullopt);
+    clear_users();
     std::cout << "read png exception" << std::endl;
     return;
   }
