@@ -15,9 +15,8 @@ namespace filesystem = std::filesystem;
 class image_generator {
 public:
   image_generator(const cv::Size output_size);
-  void generate_single(const filesystem::path& path, cv::Mat& dst);
-  void generate_tile(const std::set<filesystem::path>::iterator path_begin,
-                     const std::set<filesystem::path>::iterator path_end, cv::Mat& dst);
+  void generate_single(const filesystem::path& path, const cv::Mat& src, cv::Mat& dst);
+  void generate_tile(const std::vector<cv::Mat>& images, cv::Mat& dst);
 
 private:
   const char* font_            = "/usr/share/fonts/TTF/migu-1c-regular.ttf";

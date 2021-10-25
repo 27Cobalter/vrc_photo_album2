@@ -45,35 +45,46 @@ auto main(int argc, char** argv) -> int {
     }
   }
 
-// 画像生成部分
+  // 画像生成部分
+  const int tile_size = 9;
+// #pragma omp parallel for num_threads(1)
 #pragma omp parallel for
-  for (int i = 0; i < resource_paths.size(); i++) {
-    auto it = std::next(resource_paths.begin(), (i));
-    cv::Mat dst;
-    if (i % 9 == 0) {
-      image_generator generator(output_size);
-      generator.generate_tile(it, resource_paths.end(), dst);
-
-      cv::imwrite(
-          output_dir.string() + (boost::format("img-%05d_%05d.png") % (i / 9) % (i % 9)).str(),
-          dst);
-      dst.release();
+  for (int i = 0; i < (resource_paths.size() + tile_size - 1) / tile_size; i++) {
+    const int index = i * tile_size;
+    auto it         = std::next(resource_paths.begin(), index);
+    std::vector<cv::Mat> images(
+        std::min(static_cast<int>(std::distance(it, resource_paths.end())), tile_size));
+    std::vector<cv::Mat> dsts(images.size() + 1);
+#pragma omp parallel for
+    for (int j = 0; j < images.size(); j++) {
+      images[j] = cv::imread(*(std::next(it, j)));
     }
-    std::cout << it->filename().string() << std::endl;
     image_generator generator(output_size);
-    generator.generate_single((*it), dst);
+    generator.generate_tile(images, dsts[0]);
 
-    std::cout << "write: " << output_dir.string() + it->filename().string() << " -> "
-              << output_dir.string() +
-                     (boost::format("img-%05d_%05d.png") % (i / 9) % (i % 9 + 1)).str()
-              << std::endl;
-    cv::imwrite(output_dir.string() +
-                    (boost::format("img-%05d_%05d.png") % (i / 9) % (i % 9 + 1)).str(),
-                dst);
-    dst.release();
+#pragma omp parallel for
+    for (int j = 0; j < images.size(); j++) {
+      auto id = std::next(it, j);
+      // std::cout << id->filename().string() << std::endl;
+      image_generator generator(output_size);
+      generator.generate_single(*id, images[j], dsts[j + 1]);
+      std::string log(std::string("") + "generate: " + output_dir.string() +
+                      id->filename().string() + " -> " + output_dir.string() +
+                      (boost::format("img-%05d_%05d.png") % i % (j + 1)).str());
+#pragma omp critical
+      std::cout << log << std::endl;
+    }
+
+#pragma omp parallel for
+    for (int j = 0; j < dsts.size(); j++) {
+      auto id = std::next(it, j);
+      cv::imwrite(output_dir.string() + (boost::format("img-%05d_%05d.png") % i % (j)).str(),
+                  dsts[j]);
+      dsts[j].release();
+    }
   }
 
-// 10枚毎のブロック生成部分
+  // 10枚毎のブロック生成部分
 #pragma omp parallel for
   for (int i = 0; i < (resource_paths.size() + 8) / 9; i++) {
     std::string command = (boost::format(std::string("") +
