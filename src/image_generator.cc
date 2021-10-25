@@ -19,8 +19,10 @@ void image_generator::generate_single(const filesystem::path& path, const cv::Ma
   metadata.read(path);
 
   double scale = (static_cast<double>(dst.rows) / src.rows);
+  int dx       = (dst.cols - src.cols * scale) / 2;
   if (metadata.has_any()) {
     scale *= picture_ratio_;
+    dx *= picture_ratio_;
     put_metadata(metadata, dst);
   } else if (src.size() == dst.size()) {
     // メタデータなしで同じサイズの画像
@@ -28,7 +30,7 @@ void image_generator::generate_single(const filesystem::path& path, const cv::Ma
     return;
   }
 
-  cv::Mat affine = (cv::Mat_<double>(2, 3) << scale, 0, 0, 0, scale, 0);
+  cv::Mat affine = (cv::Mat_<double>(2, 3) << scale, 0, dx, 0, scale, 0);
   cv::warpAffine(src, dst, affine, dst.size(), cv::INTER_LINEAR, cv::BORDER_TRANSPARENT);
 }
 
@@ -44,8 +46,10 @@ void image_generator::generate_tile(
   int i = 8;
   for (auto image_it = images.begin(); image_it != images.end(); image_it++, i--) {
     const double scale = (static_cast<double>(dst.rows) / image_it->rows) / tile_width;
-    cv::Mat affine = (cv::Mat_<double>(2, 3) << scale, 0, dx * std::floor(i % tile_width), 0,
-                      scale, dy * (i / tile_width));
+    const int dx_tmp   = (dx - image_it->cols * scale) / 2;
+    cv::Mat affine =
+        (cv::Mat_<double>(2, 3) << scale, 0, dx * std::floor(i % tile_width) + dx_tmp, 0, scale,
+         dy * (i / tile_width));
     cv::warpAffine(*image_it, dst, affine, dst.size(), cv::INTER_LINEAR,
                    cv::BORDER_TRANSPARENT);
   }

@@ -110,12 +110,12 @@ auto main(int argc, char** argv) -> int {
          "#EXT-X-VERSION:3\n"
          "#EXT-X-TARGETDURATION:1\n"
          "#EXT-X-MEDIA-SEQUENCE:0\n"
-         "#EXT-X-PLAYLIST-TYPE:EVENT\n"
-         "#EXTINF:1.000000,\n"
-         "video-00000_00000.ts\n";
-  for (int i = 1; i < (resource_paths.size() + 8) / 9; i++) {
-    ofs << "#EXT-X-DISCONTINUITY\n"
-           "#EXTINF:1.000000\n"
+         "#EXT-X-PLAYLIST-TYPE:EVENT\n\n";
+  auto path = resource_paths.begin();
+  for (int i = 0; i < (resource_paths.size() + 8) / 9; i++, path = std::next(path, 9)) {
+    ofs << boost::format("#%s") % path->filename().string() << "\n"
+        << "#EXT-X-DISCONTINUITY\n"
+        << "#EXTINF:1.000000\n"
         << boost::format("video-%05d_00000.ts\n") % i;
   }
   ofs << "#EXT-X-ENDLIST";
