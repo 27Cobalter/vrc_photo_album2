@@ -22,7 +22,6 @@ chunk_util::chunk_util(filesystem::path path) {
 }
 
 chunk_util::~chunk_util() {
-  png_destroy_read_struct(&png_ptr, &info_ptr, &end_ptr);
   std::fclose(fp);
 }
 
@@ -86,6 +85,7 @@ decltype(auto) chunk_util::read() {
     meta_chunks->push_back(chunk);
   }
 
+  png_destroy_read_struct(&png_ptr, &info_ptr, &end_ptr);
   return meta_chunks;
 }
 
@@ -202,12 +202,7 @@ void meta_tool::read(filesystem::path path) {
       }
     }
   } catch (...) {
-    set_date(std::nullopt);
-    set_photographer(std::nullopt);
-    set_world(std::nullopt);
-    clear_users();
-    std::cout << "read png exception" << std::endl;
-    return;
+    std::cout << "read png exception: " << path.string() << std::endl;
   }
 }
 } // namespace vrc_photo_album2::meta_tool
