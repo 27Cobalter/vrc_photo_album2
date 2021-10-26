@@ -53,7 +53,8 @@ auto main(int argc, char** argv) -> int {
   hls_manager manager(video_dir.string() + "vrc_photo_album.m3u8");
   int update_index = 0;
   auto it          = resource_paths.begin();
-  for (; update_index < (resource_paths.size() + tile_size - 1) / tile_size;) {
+  auto segment_num = (resource_paths.size() + tile_size - 1) / tile_size;
+  for (; update_index < segment_num;) {
     if (!manager.next_segment()) {
       break;
     }
@@ -69,12 +70,12 @@ auto main(int argc, char** argv) -> int {
       break;
     }
   }
-  std::cout << "update from " << update_index << "th block" << std::endl;
+  std::cout << "update from " << update_index << " th block" << std::endl;
 
   // 画像生成部分
-// #pragma omp parallel for num_threads(1)
+  // ここを消すと内側が並列化されるので1ブロック生成時は消すと良い（いい方法ない？）
 #pragma omp parallel for
-  for (int i = update_index; i < (resource_paths.size() + tile_size - 1) / tile_size; i++) {
+  for (int i = update_index; i < segment_num; i++) {
     const int index = i * tile_size;
     auto it         = std::next(resource_paths.begin(), index);
     std::vector<cv::Mat> images(n_or_end(it, resource_paths.end(), tile_size));
@@ -91,11 +92,10 @@ auto main(int argc, char** argv) -> int {
       auto id = std::next(it, j);
       image_generator generator(output_size);
       generator.generate_single(*id, images[j], dsts[j + 1]);
-      std::string log(std::string("") + "generate: " + output_dir.string() +
-                      id->filename().string() + " -> " + output_dir.string() +
-                      (boost::format("img-%05d_%05d.png") % i % (j + 1)).str());
-#pragma omp critical
-      std::cout << log << std::endl;
+      // std::string log(std::string("") + "generate: " + output_dir.string() +
+      //                 id->filename().string() + " -> " + output_dir.string() +
+      //                 (boost::format("img-%05d_%05d.png") % i % (j + 1)).str());
+      // std::cout << log << std::endl;
     }
 
 #pragma omp parallel for
@@ -131,8 +131,7 @@ auto main(int argc, char** argv) -> int {
          "#EXT-X-MEDIA-SEQUENCE:0\n"
          "#EXT-X-PLAYLIST-TYPE:EVENT\n\n";
   auto path = resource_paths.begin();
-  for (int i = 0; i < (resource_paths.size() + tile_size - 1) / tile_size;
-       i++, std::advance(path, tile_size)) {
+  for (int i = 0; i < segment_num; i++, std::advance(path, tile_size)) {
     auto end = std::next(path, n_or_end(path, resource_paths.end(), tile_size) - 1);
     ofs << boost::format("#src_start=%s") % path->filename().string() << "\n"
         << boost::format("#src_end=%s") % end->filename().string() << "\n"
@@ -141,6 +140,7 @@ auto main(int argc, char** argv) -> int {
         << boost::format("video-%05d_00000.ts\n") % i;
   }
   ofs << "#EXT-X-ENDLIST";
+  std::cout << "complete!" << std::endl;
 
   return 0;
 }

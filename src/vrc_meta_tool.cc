@@ -1,8 +1,10 @@
 #include "vrc_meta_tool.h"
 
 #include <cstdio>
+#include <cstring>
 #include <filesystem>
 #include <iostream>
+#include <iterator>
 #include <map>
 #include <memory>
 #include <optional>
@@ -14,15 +16,9 @@
 
 namespace vrc_photo_album2::meta_tool {
 
-chunk_util::chunk_util(filesystem::path path) {
-  fp = std::fopen(path.c_str(), "rb");
-  if (!fp) {
-    std::runtime_error("file can not open.");
-  }
-}
-
+chunk_util::chunk_util(filesystem::path path) : path_(path) {}
 chunk_util::~chunk_util() {
-  std::fclose(fp);
+  if (fp != NULL) std::fclose(fp);
 }
 
 decltype(auto) chunk_util::parse_chunk(png_unknown_chunk chunk) {
@@ -32,8 +28,19 @@ decltype(auto) chunk_util::parse_chunk(png_unknown_chunk chunk) {
       std::string(reinterpret_cast<char*>(chunk.data)).substr(0, chunk.size));
 }
 
+decltype(auto) chunk_util::parse_chunk(chunk_s& chunk) {
+  // chunk.dataは終端文字が入っていないため部分文字列を取得する
+  return std::make_tuple(std::string(reinterpret_cast<char*>(chunk.head_.type), 4),
+                         std::string(reinterpret_cast<char*>(chunk.data_), chunk.size()));
+}
+
 decltype(auto) chunk_util::read() {
   constexpr int png_header_size = 8;
+
+  fp = std::fopen(path_.c_str(), "rb");
+  if (!fp) {
+    std::runtime_error("file can not open.");
+  }
 
   png_byte header[png_header_size];
   std::fread(header, 1, png_header_size, fp);
@@ -87,6 +94,56 @@ decltype(auto) chunk_util::read() {
 
   png_destroy_read_struct(&png_ptr, &info_ptr, &end_ptr);
   return meta_chunks;
+}
+
+decltype(auto) chunk_util::naive_read() {
+  constexpr int png_header_size                = 8;
+  const unsigned char png_sig[png_header_size] = {0x89, 0x50, 0x4e, 0x47,
+                                                  0x0d, 0x0a, 0x1a, 0x0a};
+  auto meta_chunks = std::make_unique<std::vector<std::tuple<std::string, std::string>>>();
+
+  char header[png_header_size];
+  std::ifstream ifs(path_.string(), std::ios::binary);
+  ifs.read(header, 8);
+
+  if (std::strncmp((char*)header, (char*)png_sig, png_header_size) != 0) {
+    throw std::invalid_argument("not png file.");
+  }
+
+  std::stringstream ss{
+      std::string(std::istreambuf_iterator<char>(ifs), std::istreambuf_iterator<char>())};
+
+  std::vector<const char*> vrc_meta_chunks;
+  vrc_meta_chunks.push_back("vrCd");
+  vrc_meta_chunks.push_back("vrCp");
+  vrc_meta_chunks.push_back("vrCw");
+  vrc_meta_chunks.push_back("vrCu");
+
+  for (;;) {
+    chunk_s ch;
+    ss.read((char*)&ch.head_, sizeof(header));
+
+    if (std::strncmp(ch.head_.type, "IEND", 4) == 0) {
+      return meta_chunks;
+    }
+
+    bool skip = true;
+    for (auto meta_chunk : vrc_meta_chunks) {
+      if (std::strncmp(ch.head_.type, meta_chunk, 4) == 0) {
+        skip = false;
+        std::vector<char> dat(ch.size());
+        ch.data_ = dat.data();
+        ss.read((char*)ch.data_, ch.size());
+        ss.seekg(4, std::iostream::cur);
+        auto chunk = parse_chunk(ch);
+        meta_chunks->push_back(chunk);
+      }
+    }
+
+    if (skip) {
+      ss.seekg(ch.size() + 4, std::iostream::cur);
+    }
+  }
 }
 
 // decltype(auto) chunk_util::write() {}
@@ -188,7 +245,8 @@ void meta_tool::read(filesystem::path path) {
 
   chunk_util util(path);
   try {
-    auto chunks = util.read();
+    auto chunks = util.naive_read();
+    // auto chunks = util.read();
     for (auto chunk : *chunks) {
       auto [type, data] = chunk;
       if (type == "vrCd") {

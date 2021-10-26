@@ -2,8 +2,10 @@
 #define VRC_PHOTO_ALBUM2_VRC_META_TOOL_H
 
 #include <filesystem>
+#include <fstream>
 #include <map>
 #include <memory>
+#include <netinet/in.h>
 #include <optional>
 #include <string>
 
@@ -21,17 +23,34 @@ typedef struct {
   std::map<std::string, std::optional<std::string>> users;
 } meta_data;
 
+struct header {
+  uint32_t size;
+  char type[4];
+};
+
+class chunk_s {
+public:
+  header head_;
+  char* data_;
+  uint32_t size() {
+    return ntohl(this->head_.size);
+  };
+};
+
 class chunk_util {
 public:
   chunk_util(filesystem::path path);
   ~chunk_util();
   decltype(auto) read();
+  decltype(auto) naive_read();
   // decltype(auto) write();
   // decltype(auto) create_chunk();
 
 private:
   decltype(auto) parse_chunk(png_unknown_chunk chunk);
-  std::FILE* fp;
+  decltype(auto) parse_chunk(chunk_s& chunk);
+  filesystem::path path_;
+  std::FILE* fp = NULL;
   png_structp png_ptr;
   png_infop info_ptr;
   png_infop end_ptr;
