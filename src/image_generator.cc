@@ -43,8 +43,8 @@ void image_generator::generate_tile(
   const int dx         = output_size_.width / tile_width;
   const int dy         = output_size_.height / tile_width;
 
-  int i = 8;
-  for (auto image_it = images.begin(); image_it != images.end(); image_it++, i--) {
+  int i = 0;
+  for (auto image_it = images.begin(); image_it != images.end(); image_it++, i++) {
     const double scale = (static_cast<double>(dst.rows) / image_it->rows) / tile_width;
     const int dx_tmp   = (dx - image_it->cols * scale) / 2;
     cv::Mat affine =
