@@ -104,11 +104,11 @@ auto main(int argc, char** argv) -> int {
 
     // 10枚毎のブロック生成部分
     std::string command = (boost::format(std::string("") +
-                                         "ffmpeg -loglevel error -framerate 2 "
+                                         "ffmpeg -loglevel error -framerate 1 "
                                          "-i " +
                                          output_dir.string() +
                                          "img-%05d_%s.png -vcodec libx264 "
-                                         "-pix_fmt yuv420p -r 2 -f hls -hls_time 5 "
+                                         "-pix_fmt yuv420p -r 5 -f hls -hls_time 10 "
                                          "-hls_playlist_type vod -hls_segment_filename "
                                          "\"" +
                                          video_dir.string() + "video-%05d_%s.ts\" " +
@@ -124,7 +124,7 @@ auto main(int argc, char** argv) -> int {
   std::ofstream ofs(video_dir.string() + "vrc_photo_album.m3u8");
   ofs << "#EXTM3U\n"
          "#EXT-X-VERSION:3\n"
-         "#EXT-X-TARGETDURATION:5\n"
+         "#EXT-X-TARGETDURATION:10\n"
          "#EXT-X-MEDIA-SEQUENCE:0\n"
          "#EXT-X-PLAYLIST-TYPE:EVENT\n\n";
   auto path = resource_paths.begin();
@@ -133,7 +133,7 @@ auto main(int argc, char** argv) -> int {
     ofs << boost::format("#src_start=%s") % path->filename().string() << "\n"
         << boost::format("#src_end=%s") % end->filename().string() << "\n"
         << "#EXT-X-DISCONTINUITY\n"
-        << "#EXTINF:5.000000\n"
+        << "#EXTINF:10.000000\n"
         << boost::format("video-%05d_00000.ts\n") % i;
   }
   ofs << "#EXT-X-ENDLIST";
