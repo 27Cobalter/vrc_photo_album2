@@ -121,22 +121,24 @@ auto main(int argc, char** argv) -> int {
 
   // hlsのメタデータ変更部分
   std::cout << "writeing m3u8" << std::endl;
-  std::ofstream ofs(video_dir.string() + "vrc_photo_album.m3u8");
-  ofs << "#EXTM3U\n"
-         "#EXT-X-VERSION:3\n"
-         "#EXT-X-TARGETDURATION:10\n"
-         "#EXT-X-MEDIA-SEQUENCE:0\n"
-         "#EXT-X-PLAYLIST-TYPE:EVENT\n\n";
+  std::stringstream ss;
+  ss << "#EXTM3U\n"
+        "#EXT-X-VERSION:3\n"
+        "#EXT-X-TARGETDURATION:10\n"
+        "#EXT-X-MEDIA-SEQUENCE:0\n"
+        "#EXT-X-PLAYLIST-TYPE:EVENT\n\n";
   auto path = resource_paths.begin();
   for (int i = 0; i < segment_num; i++, std::advance(path, tile_size)) {
     auto end = std::next(path, n_or_end(path, resource_paths.end(), tile_size) - 1);
-    ofs << boost::format("#src_start=%s") % path->filename().string() << "\n"
-        << boost::format("#src_end=%s") % end->filename().string() << "\n"
-        << "#EXT-X-DISCONTINUITY\n"
-        << "#EXTINF:10.000000\n"
-        << boost::format("video-%05d_00000.ts\n") % i;
+    ss << boost::format("#src_start=%s") % path->filename().string() << "\n"
+       << boost::format("#src_end=%s") % end->filename().string() << "\n"
+       << "#EXT-X-DISCONTINUITY\n"
+       << "#EXTINF:10.000000\n"
+       << boost::format("video-%05d_00000.ts\n") % i;
   }
-  ofs << "#EXT-X-ENDLIST";
+  ss << "#EXT-X-ENDLIST\n";
+  std::ofstream ofs(video_dir.string() + "vrc_photo_album.m3u8");
+  ofs << ss.str();
   std::cout << "complete!" << std::endl;
 
   return 0;
