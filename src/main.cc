@@ -1,4 +1,3 @@
-#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -7,9 +6,7 @@
 #include <boost/format.hpp>
 #include <omp.h>
 #include <opencv2/core/core.hpp>
-#include <opencv2/freetype.hpp>
 #include <opencv2/imgcodecs.hpp>
-#include <opencv2/imgproc.hpp>
 
 #include "hls_helper.h"
 #include "image_generator.h"

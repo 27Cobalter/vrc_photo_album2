@@ -1,32 +1,15 @@
 #include "vrc_meta_tool.h"
 
-#include <cstdio>
 #include <cstring>
-#include <filesystem>
+#include <fstream>
 #include <iostream>
-#include <iterator>
-#include <map>
-#include <memory>
-#include <optional>
-#include <string>
 #include <vector>
 
 #include <boost/format.hpp>
-#include <png.h>
 
 namespace vrc_photo_album2::meta_tool {
 
 chunk_util::chunk_util(filesystem::path path) : path_(path) {}
-chunk_util::~chunk_util() {
-  if (fp != NULL) std::fclose(fp);
-}
-
-decltype(auto) chunk_util::parse_chunk(png_unknown_chunk chunk) {
-  // chunk.dataは終端文字が入っていないため部分文字列を取得する
-  return std::make_tuple(
-      std::string(reinterpret_cast<char*>(chunk.name)),
-      std::string(reinterpret_cast<char*>(chunk.data)).substr(0, chunk.size));
-}
 
 decltype(auto) chunk_util::parse_chunk(chunk_s& chunk) {
   // chunk.dataは終端文字が入っていないため部分文字列を取得する
@@ -35,68 +18,6 @@ decltype(auto) chunk_util::parse_chunk(chunk_s& chunk) {
 }
 
 decltype(auto) chunk_util::read() {
-  constexpr int png_header_size = 8;
-
-  fp = std::fopen(path_.c_str(), "rb");
-  if (!fp) {
-    std::runtime_error("file can not open.");
-  }
-
-  png_byte header[png_header_size];
-  std::fread(header, 1, png_header_size, fp);
-  if (png_sig_cmp(header, 0, png_header_size)) throw std::invalid_argument("not png file.");
-
-  png_ptr = png_create_read_struct(PNG_LIBPNG_VER_STRING, nullptr, nullptr, nullptr);
-  if (!png_ptr) throw std::runtime_error("failed to png_create_read_struct.");
-
-  auto meta_chunks = std::make_unique<std::vector<std::tuple<std::string, std::string>>>();
-
-  if (setjmp(png_jmpbuf(png_ptr))) {
-    return meta_chunks;
-  }
-
-  info_ptr = png_create_info_struct(png_ptr);
-  end_ptr  = png_create_info_struct(png_ptr);
-  if (!info_ptr || !end_ptr) throw std::invalid_argument("failed to png_create_info_struct.");
-
-  if (!fp) {
-    std::cout << "not fp" << std::endl;
-  }
-
-  png_init_io(png_ptr, fp);
-  png_set_sig_bytes(png_ptr, png_header_size);
-
-  // unknown chunkの定義
-  constexpr png_byte vrc_meta_chunks[] = {'v', 'r', 'C', 'd', '\0', 'v', 'r', 'C', 'p', '\0',
-                                          'v', 'r', 'C', 'w', '\0', 'v', 'r', 'C', 'u', '\0'};
-
-  png_set_keep_unknown_chunks(png_ptr, 3, vrc_meta_chunks, sizeof(vrc_meta_chunks) / 5);
-
-  png_read_update_info(png_ptr, info_ptr);
-  png_read_info(png_ptr, info_ptr);
-  png_read_end(png_ptr, end_ptr);
-
-  png_unknown_chunkp info_unknown_ptr;
-  png_unknown_chunkp end_unknown_ptr;
-  auto info_unknown_num =
-      static_cast<int>(png_get_unknown_chunks(png_ptr, info_ptr, &info_unknown_ptr));
-  auto end_unknown_num =
-      static_cast<int>(png_get_unknown_chunks(png_ptr, end_ptr, &end_unknown_ptr));
-
-  for (int i = 0; i < info_unknown_num; i++) {
-    auto chunk = parse_chunk(info_unknown_ptr[i]);
-    meta_chunks->push_back(chunk);
-  }
-  for (int i = 0; i < end_unknown_num; i++) {
-    auto chunk = parse_chunk(end_unknown_ptr[i]);
-    meta_chunks->push_back(chunk);
-  }
-
-  png_destroy_read_struct(&png_ptr, &info_ptr, &end_ptr);
-  return meta_chunks;
-}
-
-decltype(auto) chunk_util::naive_read() {
   constexpr int png_header_size                = 8;
   const unsigned char png_sig[png_header_size] = {0x89, 0x50, 0x4e, 0x47,
                                                   0x0d, 0x0a, 0x1a, 0x0a};
@@ -245,7 +166,7 @@ void meta_tool::read(filesystem::path path) {
 
   chunk_util util(path);
   try {
-    auto chunks = util.naive_read();
+    auto chunks = util.read();
     // auto chunks = util.read();
     for (auto chunk : *chunks) {
       auto [type, data] = chunk;

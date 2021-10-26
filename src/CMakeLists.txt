@@ -7,5 +7,4 @@ add_executable(vrc_photo_album2 ${SOURCE_FILES})
 target_link_libraries(
   vrc_photo_album2
   ${OpenCV_LIBS}
-  ${PNG_LIBRARIES}
   Threads::Threads)

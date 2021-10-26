@@ -29,8 +29,6 @@ if(OpenMP_FOUND)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
 endif()
 
-pkg_check_modules(PNG REQUIRED libpng)
-
 set(LINK_FLAGS "${LINK_FLAGS} -lboost_thread")
 
 include_directories(${PNG_INCLUDE_DIRS})

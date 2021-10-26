@@ -1,15 +1,12 @@
 #ifndef VRC_PHOTO_ALBUM2_VRC_META_TOOL_H
 #define VRC_PHOTO_ALBUM2_VRC_META_TOOL_H
 
+#include <netinet/in.h>
 #include <filesystem>
-#include <fstream>
 #include <map>
 #include <memory>
-#include <netinet/in.h>
 #include <optional>
 #include <string>
-
-#include <png.h>
 
 namespace vrc_photo_album2::meta_tool {
 
@@ -40,20 +37,13 @@ public:
 class chunk_util {
 public:
   chunk_util(filesystem::path path);
-  ~chunk_util();
   decltype(auto) read();
-  decltype(auto) naive_read();
   // decltype(auto) write();
   // decltype(auto) create_chunk();
 
 private:
-  decltype(auto) parse_chunk(png_unknown_chunk chunk);
   decltype(auto) parse_chunk(chunk_s& chunk);
   filesystem::path path_;
-  std::FILE* fp = NULL;
-  png_structp png_ptr;
-  png_infop info_ptr;
-  png_infop end_ptr;
 };
 
 class meta_tool {
