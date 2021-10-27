@@ -61,9 +61,9 @@ void image_generator::generate_tile(const std::set<filesystem::path>::iterator p
     const cv::Point date_pos =
         cv::Point(mx, my + (output_size_.height * (picture_ratio_ + 0.1)) / 3);
     std::string filename = filename_date(*path_it);
-    filename[10] = ' ';
-    filename[13] = ':';
-    filename[16] = ':';
+    filename[10]         = ' ';
+    filename[13]         = ':';
+    filename[16]         = ':';
     freetype2_->putText(dst, filename.substr(0, filename.size() - 4), date_pos, font_size_ / 3,
                         text_color_, 1, cv::LINE_AA, false);
   }
