@@ -1,4 +1,5 @@
 #include <cstdio>
+#include <chrono>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -68,53 +69,54 @@ auto main(int argc, char** argv) -> int {
 
   // 画像生成部分
   // ここを消すと内側が並列化されるので1ブロック生成時は消すと良い（いい方法ない？）
-// #pragma omp parallel for
-//   for (int i = update_index; i < segment_num; i++) {
-//     const int index = i * tile_size;
-//     auto it         = std::next(resource_paths.begin(), index);
-//     std::vector<cv::Mat> images(n_or_end(it, resource_paths.end(), tile_size));
-//     std::vector<cv::Mat> dsts(images.size() + 1);
-// #pragma omp parallel for
-//     for (int j = 0; j < images.size(); j++) {
-//       images[j] = cv::imread(*(std::next(it, j)));
-//     }
-//     image_generator generator(output_size);
-//     generator.generate_tile(it, images, dsts[0]);
-// 
-// #pragma omp parallel for
-//     for (int j = 0; j < images.size(); j++) {
-//       auto id = std::next(it, j);
-//       image_generator generator(output_size);
-//       generator.generate_single(*id, images[j], dsts[j + 1]);
-//       // std::string log(std::string("") + "generate: " + output_dir.string() +
-//       //                 id->filename().string() + " -> " + output_dir.string() +
-//       //                 (boost::format("img-%05d_%05d.png") % i % (j + 1)).str());
-//       // std::cout << log << std::endl;
-//     }
-// 
-// #pragma omp parallel for
-//     for (int j = 0; j < dsts.size(); j++) {
-//       cv::imwrite(output_dir.string() + (boost::format("img-%06d_%05d.png") % i % (j)).str(),
-//                   dsts[j]);
-//       dsts[j].release();
-//     }
-// 
-//     // 10枚毎のブロック生成部分
-//     std::string command = (boost::format("ffmpeg -loglevel error -framerate 1 "
-//                                          "-i %simg-%06d_%s.png -vcodec libx264 "
-//                                          "-pix_fmt yuv420p -r 5 -f hls -hls_time 10 "
-//                                          "-hls_playlist_type vod -hls_segment_filename "
-//                                          "\"%s%06d%s.ts\" %s%06d.m3u8") %
-//                            output_dir.string() % i % "%05d" % video_dir.string() % i % "%1d" %
-//                            video_dir.string() % i)
-//                               .str();
-//     std::cout << command << std::endl;
-//     std::system(command.c_str());
-//   }
+  // #pragma omp parallel for
+  //   for (int i = update_index; i < segment_num; i++) {
+  //     const int index = i * tile_size;
+  //     auto it         = std::next(resource_paths.begin(), index);
+  //     std::vector<cv::Mat> images(n_or_end(it, resource_paths.end(), tile_size));
+  //     std::vector<cv::Mat> dsts(images.size() + 1);
+  // #pragma omp parallel for
+  //     for (int j = 0; j < images.size(); j++) {
+  //       images[j] = cv::imread(*(std::next(it, j)));
+  //     }
+  //     image_generator generator(output_size);
+  //     generator.generate_tile(it, images, dsts[0]);
+  //
+  // #pragma omp parallel for
+  //     for (int j = 0; j < images.size(); j++) {
+  //       auto id = std::next(it, j);
+  //       image_generator generator(output_size);
+  //       generator.generate_single(*id, images[j], dsts[j + 1]);
+  //       // std::string log(std::string("") + "generate: " + output_dir.string() +
+  //       //                 id->filename().string() + " -> " + output_dir.string() +
+  //       //                 (boost::format("img-%05d_%05d.png") % i % (j + 1)).str());
+  //       // std::cout << log << std::endl;
+  //     }
+  //
+  // #pragma omp parallel for
+  //     for (int j = 0; j < dsts.size(); j++) {
+  //       cv::imwrite(output_dir.string() + (boost::format("img-%06d_%05d.png") % i %
+  //       (j)).str(),
+  //                   dsts[j]);
+  //       dsts[j].release();
+  //     }
+  //
+  //     // 10枚毎のブロック生成部分
+  //     std::string command = (boost::format("ffmpeg -loglevel error -framerate 1 "
+  //                                          "-i %simg-%06d_%s.png -vcodec libx264 "
+  //                                          "-pix_fmt yuv420p -r 5 -f hls -hls_time 10 "
+  //                                          "-hls_playlist_type vod -hls_segment_filename "
+  //                                          "\"%s%06d%s.ts\" %s%06d.m3u8") %
+  //                            output_dir.string() % i % "%05d" % video_dir.string() % i %
+  //                            "%1d" % video_dir.string() % i)
+  //                               .str();
+  //     std::cout << command << std::endl;
+  //     std::system(command.c_str());
+  //   }
 
   // hlsのメタデータ変更部分
   std::cout << "writeing m3u8" << std::endl;
-  const char* m3head = {
+  const std::string m3head = {
       "#EXTM3U\n"
       "#EXT-X-VERSION:3\n"
       "#EXT-X-TARGETDURATION:10\n"
@@ -133,17 +135,21 @@ auto main(int argc, char** argv) -> int {
                     (segment_num - i - 1);
   }
   m3stream << "#EXT-X-ENDLIST\n";
-#define FSTREAM
+  auto start = std::chrono::system_clock::now();
+// #define FSTREAM
 #ifdef FSTREAM
   std::ofstream ofs(video_dir.string() + "vrc_photo_album.m3u8");
   ofs << m3head << m3index.str() << m3stream.str();
 #else
-  auto fp = std::fopen((video_dir.string()+"vrc_photo_album.m3u8").c_str(), "w");
-  std::fwrite(m3head, 1, sizeof(m3head), fp);
+  auto fp = std::fopen((video_dir.string() + "vrc_photo_album.m3u8").c_str(), "w");
+  std::fwrite(m3head.c_str(), 1, m3head.size(), fp);
   std::fwrite(m3index.str().c_str(), 1, m3index.str().size(), fp);
   std::fwrite(m3stream.str().c_str(), 1, m3stream.str().size(), fp);
 #endif
-
+  auto end = std::chrono::system_clock::now();
+  std::cout << "file write time:"
+            << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count()
+            << std::endl;
   std::cout << "complete!" << std::endl;
 
   return 0;
