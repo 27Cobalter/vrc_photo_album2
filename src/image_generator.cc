@@ -65,7 +65,7 @@ void image_generator::generate_tile(const std::set<filesystem::path>::iterator p
     filename[13] = ':';
     filename[16] = ':';
     freetype2_->putText(dst, filename.substr(0, filename.size() - 4), date_pos, font_size_ / 3,
-                        text_color_, thickness_, cv::LINE_AA, false);
+                        text_color_, 1, cv::LINE_AA, false);
   }
 }
 
