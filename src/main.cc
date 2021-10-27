@@ -10,15 +10,11 @@
 
 #include "hls_helper.h"
 #include "image_generator.h"
+#include "util.h"
 #include "vrc_meta_tool.h"
 
 namespace filesystem = std::filesystem;
 using namespace vrc_photo_album2;
-
-template <typename Iterator>
-inline int n_or_end(Iterator it, Iterator end, int n) {
-  return std::min(static_cast<int>(std::distance(it, end)), n);
-}
 
 auto main(int argc, char** argv) -> int {
   cv::CommandLineParser parser(
@@ -82,7 +78,7 @@ auto main(int argc, char** argv) -> int {
       images[j] = cv::imread(*(std::next(it, j)));
     }
     image_generator generator(output_size);
-    generator.generate_tile(images, dsts[0]);
+    generator.generate_tile(it, images, dsts[0]);
 
 #pragma omp parallel for
     for (int j = 0; j < images.size(); j++) {
@@ -97,23 +93,19 @@ auto main(int argc, char** argv) -> int {
 
 #pragma omp parallel for
     for (int j = 0; j < dsts.size(); j++) {
-      cv::imwrite(output_dir.string() + (boost::format("img-%05d_%05d.png") % i % (j)).str(),
+      cv::imwrite(output_dir.string() + (boost::format("img-%06d_%05d.png") % i % (j)).str(),
                   dsts[j]);
       dsts[j].release();
     }
 
     // 10枚毎のブロック生成部分
-    std::string command = (boost::format(std::string("") +
-                                         "ffmpeg -loglevel error -framerate 1 "
-                                         "-i " +
-                                         output_dir.string() +
-                                         "img-%05d_%s.png -vcodec libx264 "
+    std::string command = (boost::format("ffmpeg -loglevel error -framerate 1 "
+                                         "-i %simg-%06d_%s.png -vcodec libx264 "
                                          "-pix_fmt yuv420p -r 5 -f hls -hls_time 10 "
                                          "-hls_playlist_type vod -hls_segment_filename "
-                                         "\"" +
-                                         video_dir.string() + "video-%05d_%s.ts\" " +
-                                         video_dir.string() + "video-%05d.m3u8") %
-                           i % "%05d" % i % "%05d" % i)
+                                         "\"%s%06d%s.ts\" %s%06d.m3u8") %
+                           output_dir.string() % i % "%05d" % video_dir.string() % i % "%1d" %
+                           video_dir.string() % i)
                               .str();
     std::cout << command << std::endl;
     std::system(command.c_str());
@@ -121,24 +113,27 @@ auto main(int argc, char** argv) -> int {
 
   // hlsのメタデータ変更部分
   std::cout << "writeing m3u8" << std::endl;
-  std::stringstream ss;
-  ss << "#EXTM3U\n"
-        "#EXT-X-VERSION:3\n"
-        "#EXT-X-TARGETDURATION:10\n"
-        "#EXT-X-MEDIA-SEQUENCE:0\n"
-        "#EXT-X-PLAYLIST-TYPE:EVENT\n\n";
+  const char* m3head = {
+      "#EXTM3U\n"
+      "#EXT-X-VERSION:3\n"
+      "#EXT-X-TARGETDURATION:10\n"
+      "#EXT-X-MEDIA-SEQUENCE:0\n"
+      "#EXT-X-PLAYLIST-TYPE:EVENT\n\n"};
+  std::stringstream m3stream;
+  std::stringstream m3index;
   auto path = resource_paths.begin();
   for (int i = 0; i < segment_num; i++, std::advance(path, tile_size)) {
     auto end = std::next(path, n_or_end(path, resource_paths.end(), tile_size) - 1);
-    ss << boost::format("#src_start=%s") % path->filename().string() << "\n"
-       << boost::format("#src_end=%s") % end->filename().string() << "\n"
-       << "#EXT-X-DISCONTINUITY\n"
-       << "#EXTINF:10.000000\n"
-       << boost::format("video-%05d_00000.ts\n") % i;
+    m3index << boost::format("#v%06d,%s,%s\n") % i % filename_date(*path) % filename_date(*end);
+    m3stream << boost::format(
+                    "#EXT-X-DISCONTINUITY\n"
+                    "#EXTINF:10\n"
+                    "%06d.ts\n") %
+                    (segment_num - i - 1);
   }
-  ss << "#EXT-X-ENDLIST\n";
+  m3stream << "#EXT-X-ENDLIST\n";
   std::ofstream ofs(video_dir.string() + "vrc_photo_album.m3u8");
-  ofs << ss.str();
+  ofs << m3head << m3index.str() << m3stream.str();
   std::cout << "complete!" << std::endl;
 
   return 0;

@@ -16,7 +16,8 @@ class image_generator {
 public:
   image_generator(const cv::Size output_size);
   void generate_single(const filesystem::path& path, const cv::Mat& src, cv::Mat& dst);
-  void generate_tile(const std::vector<cv::Mat>& images, cv::Mat& dst);
+  void generate_tile(const std::set<filesystem::path>::iterator path,
+                     const std::vector<cv::Mat>& images, cv::Mat& dst);
 
 private:
   const char* font_            = "/usr/share/fonts/TTF/migu-1c-regular.ttf";
@@ -25,11 +26,10 @@ private:
   const int thickness_         = 2;
   cv::Ptr<cv::freetype::FreeType2> freetype2_;
   cv::Size output_size_;
-  // int font_size_;
-  // int user_font_size_;
-  // cv::Point date_pos_;
-  // cv::Point world_pos_;
-  // cv::Point user_pos_;
+  double tmp_size_;
+  double text_size_;
+  int font_size_;
+  int user_font_size_;
 
   void put_metadata(meta_tool::meta_tool& metadata, cv::Mat& dst);
 };

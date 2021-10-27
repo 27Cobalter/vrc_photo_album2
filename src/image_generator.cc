@@ -6,10 +6,16 @@
 #include <opencv2/imgcodecs.hpp>
 #include <opencv2/imgproc.hpp>
 
+#include "util.h"
+
 namespace vrc_photo_album2 {
 image_generator::image_generator(const cv::Size output_size) : output_size_(output_size) {
   freetype2_ = cv::freetype::createFreeType2();
   freetype2_->loadFontData(font_, 0);
+  tmp_size_       = output_size_.height * ((1 - picture_ratio_) / 2);
+  text_size_      = freetype2_->getTextSize("y()|", tmp_size_, thickness_, 0).height;
+  font_size_      = tmp_size_ * text_size_ / tmp_size_;
+  user_font_size_ = font_size_ >> 1;
 }
 
 void image_generator::generate_single(const filesystem::path& path, const cv::Mat& src,
@@ -34,9 +40,8 @@ void image_generator::generate_single(const filesystem::path& path, const cv::Ma
   cv::warpAffine(src, dst, affine, dst.size(), cv::INTER_LINEAR, cv::BORDER_TRANSPARENT);
 }
 
-void image_generator::generate_tile(
-
-    const std::vector<cv::Mat>& images, cv::Mat& dst) {
+void image_generator::generate_tile(const std::set<filesystem::path>::iterator path,
+                                    const std::vector<cv::Mat>& images, cv::Mat& dst) {
   dst = cv::Mat::zeros(output_size_, CV_8UC3);
 
   const int tile_width = 3;
@@ -47,36 +52,36 @@ void image_generator::generate_tile(
   for (auto image_it = images.begin(); image_it != images.end(); image_it++, i++) {
     const double scale = (static_cast<double>(dst.rows) / image_it->rows) / tile_width;
     const int dx_tmp   = (dx - image_it->cols * scale) / 2;
-    cv::Mat affine =
-        (cv::Mat_<double>(2, 3) << scale, 0, dx * std::floor(i % tile_width) + dx_tmp, 0, scale,
-         dy * (i / tile_width));
+    const int mx       = dx * std::floor(i % tile_width) + dx_tmp;
+    const int my       = dy * (i / tile_width);
+    cv::Mat affine     = (cv::Mat_<double>(2, 3) << scale, 0, mx, 0, scale, my);
     cv::warpAffine(*image_it, dst, affine, dst.size(), cv::INTER_LINEAR,
                    cv::BORDER_TRANSPARENT);
+    const cv::Point date_pos =
+        cv::Point(mx, my + (output_size_.height * (picture_ratio_ + 0.1)) / 3);
+    freetype2_->putText(dst, filename_date(*path), date_pos, font_size_ / 3, text_color_,
+                        thickness_, cv::LINE_AA, false);
   }
 }
 
 void image_generator::put_metadata(meta_tool::meta_tool& metadata, cv::Mat& dst) {
-  const double tmp_size     = output_size_.height * ((1 - picture_ratio_) / 2);
-  const double text_size    = freetype2_->getTextSize("y()|", tmp_size, thickness_, 0).height;
-  const int font_size       = tmp_size * text_size / tmp_size;
-  const int user_font_size  = font_size >> 1;
   const cv::Point date_pos  = cv::Point(0, output_size_.height * picture_ratio_);
-  const cv::Point world_pos = cv::Point(0, output_size_.height * picture_ratio_ + font_size);
+  const cv::Point world_pos = cv::Point(0, output_size_.height * picture_ratio_ + font_size_);
   const cv::Point user_pos  = cv::Point(output_size_.width * picture_ratio_, 0);
 
   if (metadata.has_date()) {
-    freetype2_->putText(dst, metadata.readable_date(), date_pos, font_size, text_color_,
+    freetype2_->putText(dst, metadata.readable_date(), date_pos, font_size_, text_color_,
                         thickness_, cv::LINE_AA, false);
   }
   if (metadata.has_world()) {
-    freetype2_->putText(dst, metadata.world(), world_pos, font_size, text_color_, thickness_,
+    freetype2_->putText(dst, metadata.world(), world_pos, font_size_, text_color_, thickness_,
                         cv::LINE_AA, false);
   }
   if (metadata.has_users()) {
     int i = 0;
     for (auto [user_name, screen_name] : metadata.users()) {
-      freetype2_->putText(dst, user_name, user_pos + cv::Point(0, user_font_size * i++),
-                          user_font_size, text_color_, thickness_, cv::LINE_AA, false);
+      freetype2_->putText(dst, user_name, user_pos + cv::Point(0, user_font_size_ * i++),
+                          user_font_size_, text_color_, thickness_, cv::LINE_AA, false);
     }
   }
 }
