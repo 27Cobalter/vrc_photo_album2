@@ -55,8 +55,8 @@ auto main(int argc, char** argv) -> int {
     }
     auto end = std::next(it, n_or_end(it, resource_paths.end(), tile_size) - 1);
     if (manager.compare_start(it->filename()) && manager.compare_end(end->filename())) {
-      std::cout << update_index << ". " << it->filename() << " - " << end->filename()
-                << " is not changed." << std::endl;
+      // std::cout << update_index << ". " << it->filename() << " - " << end->filename()
+      //           << " is not changed." << std::endl;
       update_index++;
       it = std::next(end, 1);
     } else {
@@ -65,54 +65,59 @@ auto main(int argc, char** argv) -> int {
       break;
     }
   }
+
+  if (update_index >= segment_num) {
+    std::cout << "file not changed" << std::endl;
+    return 0;
+  }
+
   std::cout << "update from " << update_index << " th block" << std::endl;
 
-  // 画像生成部分
-  // ここを消すと内側が並列化されるので1ブロック生成時は消すと良い（いい方法ない？）
-  // #pragma omp parallel for
-  //   for (int i = update_index; i < segment_num; i++) {
-  //     const int index = i * tile_size;
-  //     auto it         = std::next(resource_paths.begin(), index);
-  //     std::vector<cv::Mat> images(n_or_end(it, resource_paths.end(), tile_size));
-  //     std::vector<cv::Mat> dsts(images.size() + 1);
-  // #pragma omp parallel for
-  //     for (int j = 0; j < images.size(); j++) {
-  //       images[j] = cv::imread(*(std::next(it, j)));
-  //     }
-  //     image_generator generator(output_size);
-  //     generator.generate_tile(it, images, dsts[0]);
-  //
-  // #pragma omp parallel for
-  //     for (int j = 0; j < images.size(); j++) {
-  //       auto id = std::next(it, j);
-  //       image_generator generator(output_size);
-  //       generator.generate_single(*id, images[j], dsts[j + 1]);
-  //       // std::string log(std::string("") + "generate: " + output_dir.string() +
-  //       //                 id->filename().string() + " -> " + output_dir.string() +
-  //       //                 (boost::format("img-%05d_%05d.png") % i % (j + 1)).str());
-  //       // std::cout << log << std::endl;
-  //     }
-  //
-  // #pragma omp parallel for
-  //     for (int j = 0; j < dsts.size(); j++) {
-  //       cv::imwrite(output_dir.string() + (boost::format("img-%06d_%05d.png") % i %
-  //       (j)).str(),
-  //                   dsts[j]);
-  //       dsts[j].release();
-  //     }
-  //
-  //     // 10枚毎のブロック生成部分
-  //     std::string command = (boost::format("ffmpeg -loglevel error -framerate 1 "
-  //                                          "-i %simg-%06d_%s.png -vcodec libx264 "
-  //                                          "-pix_fmt yuv420p -r 5 -f hls -hls_time 10 "
-  //                                          "-hls_playlist_type vod -hls_segment_filename "
-  //                                          "\"%s%06d%s.ts\" %s%06d.m3u8") %
-  //                            output_dir.string() % i % "%05d" % video_dir.string() % i %
-  //                            "%1d" % video_dir.string() % i)
-  //                               .str();
-  //     std::cout << command << std::endl;
-  //     std::system(command.c_str());
-  //   }
+// 画像生成部分
+// ここを消すと内側が並列化されるので1ブロック生成時は消すと良い（いい方法ない？）
+#pragma omp parallel for
+  for (int i = update_index; i < segment_num; i++) {
+    const int index = i * tile_size;
+    auto it         = std::next(resource_paths.begin(), index);
+    std::vector<cv::Mat> images(n_or_end(it, resource_paths.end(), tile_size));
+    std::vector<cv::Mat> dsts(images.size() + 1);
+#pragma omp parallel for
+    for (int j = 0; j < images.size(); j++) {
+      images[j] = cv::imread(*(std::next(it, j)));
+    }
+    image_generator generator(output_size);
+    generator.generate_tile(it, images, dsts[0]);
+
+#pragma omp parallel for
+    for (int j = 0; j < images.size(); j++) {
+      auto id = std::next(it, j);
+      image_generator generator(output_size);
+      generator.generate_single(*id, images[j], dsts[j + 1]);
+      // std::string log(std::string("") + "generate: " + output_dir.string() +
+      //                 id->filename().string() + " -> " + output_dir.string() +
+      //                 (boost::format("img-%05d_%05d.png") % i % (j + 1)).str());
+      // std::cout << log << std::endl;
+    }
+
+#pragma omp parallel for
+    for (int j = 0; j < dsts.size(); j++) {
+      cv::imwrite(output_dir.string() + (boost::format("img-%06d_%05d.png") % i % (j)).str(),
+                  dsts[j]);
+      dsts[j].release();
+    }
+
+    // 10枚毎のブロック生成部分
+    std::string command = (boost::format("ffmpeg -loglevel error -framerate 1 "
+                                         "-i %simg-%06d_%s.png -vcodec libx264 "
+                                         "-pix_fmt yuv420p -r 5 -f hls -hls_time 10 "
+                                         "-hls_playlist_type vod -hls_segment_filename "
+                                         "\"%s%06d%s.ts\" %s%06d.m3u8") %
+                           output_dir.string() % i % "%05d" % video_dir.string() % i % "%1d" %
+                           video_dir.string() % i)
+                              .str();
+    std::cout << command << std::endl;
+    std::system(command.c_str());
+  }
 
   // hlsのメタデータ変更部分
   std::cout << "writeing m3u8" << std::endl;
@@ -136,15 +141,18 @@ auto main(int argc, char** argv) -> int {
   }
   m3stream << "#EXT-X-ENDLIST\n";
   auto start = std::chrono::system_clock::now();
-// #define FSTREAM
-#ifdef FSTREAM
+#define USE_FSTREAM
+#ifdef USE_FSTREAM
+  // 今回のケースならfstreamのが早そう?
   std::ofstream ofs(video_dir.string() + "vrc_photo_album.m3u8");
   ofs << m3head << m3index.str() << m3stream.str();
 #else
   auto fp = std::fopen((video_dir.string() + "vrc_photo_album.m3u8").c_str(), "w");
+  std::setvbuf(fp, NULL, _IOFBF, 512 * 1024);
   std::fwrite(m3head.c_str(), 1, m3head.size(), fp);
   std::fwrite(m3index.str().c_str(), 1, m3index.str().size(), fp);
   std::fwrite(m3stream.str().c_str(), 1, m3stream.str().size(), fp);
+  std::fclose(fp);
 #endif
   auto end = std::chrono::system_clock::now();
   std::cout << "file write time:"
