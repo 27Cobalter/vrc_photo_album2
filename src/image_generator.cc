@@ -48,8 +48,9 @@ void image_generator::generate_tile(const std::set<filesystem::path>::iterator p
   const int dx         = output_size_.width / tile_width;
   const int dy         = output_size_.height / tile_width;
 
-  int i = 0;
-  for (auto image_it = images.begin(); image_it != images.end(); image_it++, i++) {
+  int i        = 0;
+  auto path_it = path;
+  for (auto image_it = images.begin(); image_it != images.end(); image_it++, i++, path_it++) {
     const double scale = (static_cast<double>(dst.rows) / image_it->rows) / tile_width;
     const int dx_tmp   = (dx - image_it->cols * scale) / 2;
     const int mx       = dx * std::floor(i % tile_width) + dx_tmp;
@@ -59,8 +60,12 @@ void image_generator::generate_tile(const std::set<filesystem::path>::iterator p
                    cv::BORDER_TRANSPARENT);
     const cv::Point date_pos =
         cv::Point(mx, my + (output_size_.height * (picture_ratio_ + 0.1)) / 3);
-    freetype2_->putText(dst, filename_date(*path), date_pos, font_size_ / 3, text_color_,
-                        thickness_, cv::LINE_AA, false);
+    std::string filename = filename_date(*path_it);
+    filename[10] = ' ';
+    filename[13] = ':';
+    filename[16] = ':';
+    freetype2_->putText(dst, filename.substr(0, filename.size() - 4), date_pos, font_size_ / 3,
+                        text_color_, thickness_, cv::LINE_AA, false);
   }
 }
 
