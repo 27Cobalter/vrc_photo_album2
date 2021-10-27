@@ -87,7 +87,7 @@ void image_generator::put_metadata(meta_tool::meta_tool& metadata, cv::Mat& dst)
     int i = 0;
     for (auto [user_name, screen_name] : metadata.users()) {
       freetype2_->putText(dst, user_name, user_pos + cv::Point(0, user_font_size_ * i++),
-                          user_font_size_, text_color_, thickness_, cv::LINE_AA, false);
+                          user_font_size_, text_color_, thickness_ / 2, cv::LINE_AA, false);
     }
   }
 }
