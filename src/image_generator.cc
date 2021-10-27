@@ -48,9 +48,10 @@ void image_generator::generate_tile(const std::set<filesystem::path>::iterator p
   const int dx         = output_size_.width / tile_width;
   const int dy         = output_size_.height / tile_width;
 
-  int i        = 0;
+  // 0++で左上から8--で右下から埋めてく
+  int i        = 8;
   auto path_it = path;
-  for (auto image_it = images.begin(); image_it != images.end(); image_it++, i++, path_it++) {
+  for (auto image_it = images.begin(); image_it != images.end(); image_it++, i--, path_it++) {
     const double scale = (static_cast<double>(dst.rows) / image_it->rows) / tile_width;
     const int dx_tmp   = (dx - image_it->cols * scale) / 2;
     const int mx       = dx * std::floor(i % tile_width) + dx_tmp;
