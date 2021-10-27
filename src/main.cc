@@ -136,8 +136,8 @@ auto main(int argc, char** argv) -> int {
     m3stream << boost::format(
                     "#EXT-X-DISCONTINUITY\n"
                     "#EXTINF:10\n"
-                    "%06d.ts\n") %
-                    (segment_num - i - 1);
+                    "%06d%01d.ts\n") %
+                    (segment_num - i - 1) % 0;
   }
   m3stream << "#EXT-X-ENDLIST\n";
   auto start = std::chrono::system_clock::now();
