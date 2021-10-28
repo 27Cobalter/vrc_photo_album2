@@ -22,16 +22,19 @@ auto main(int argc, char** argv) -> int {
   cv::CommandLineParser parser(
       argc, argv,
       "{input|./resources|input directory}"
-      "{output|./export|output directory. required sub folter output_dir/(png,video)/}");
+      "{output|./export|output directory. required sub folter output_dir/(png,video)/}"
+      "{font|/usr/share/fonts/TTF/migu-1c-regular.ttf|font path}");
 
   const cv::Size output_size(1920, 1080);
+  const filesystem::path font      = filesystem::path(parser.get<std::string>("font"));
   const filesystem::path input_dir = parser.get<std::string>("input");
   const filesystem::path out_dir   = filesystem::path(parser.get<std::string>("output"));
   const filesystem::path output_dir =
       out_dir.string() + "/" + filesystem::path("png/").string();
   const filesystem::path video_dir =
       out_dir.string() + "/" + filesystem::path("video/").string();
-  std::cout << "inputdir: " << input_dir << ", output_dir" << out_dir << std::endl;
+  std::cout << "inputdir: " << input_dir << ", output_dir: " << out_dir
+            << ", font: " << font.c_str() << std::endl;
 
   std::set<std::filesystem::path> resource_paths;
   const int tile_size = 9;
@@ -85,13 +88,13 @@ auto main(int argc, char** argv) -> int {
     for (int j = 0; j < images.size(); j++) {
       images[j] = cv::imread(*(std::next(it, j)));
     }
-    image_generator generator(output_size);
+    image_generator generator(output_size, font);
     generator.generate_tile(it, images, dsts[0]);
 
 #pragma omp parallel for
     for (int j = 0; j < images.size(); j++) {
       auto id = std::next(it, j);
-      image_generator generator(output_size);
+      image_generator generator(output_size, font);
       generator.generate_single(*id, images[j], dsts[j + 1]);
       // std::string log(std::string("") + "generate: " + output_dir.string() +
       //                 id->filename().string() + " -> " + output_dir.string() +

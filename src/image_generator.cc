@@ -9,9 +9,10 @@
 #include "util.h"
 
 namespace vrc_photo_album2 {
-image_generator::image_generator(const cv::Size output_size) : output_size_(output_size) {
+image_generator::image_generator(const cv::Size output_size, const filesystem::path font)
+    : output_size_(output_size), font_(font) {
   freetype2_ = cv::freetype::createFreeType2();
-  freetype2_->loadFontData(font_, 0);
+  freetype2_->loadFontData(font_.c_str(), 0);
   tmp_size_       = output_size_.height * ((1 - picture_ratio_) / 2);
   text_size_      = freetype2_->getTextSize("y()|", tmp_size_, thickness_, 0).height;
   font_size_      = tmp_size_ * text_size_ / tmp_size_;
