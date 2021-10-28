@@ -5,7 +5,7 @@
 
 ## 必要なライブラリ
 - boost
-- g++ (clang++12.0.1とopencv4.5だと文字入れがうまくいかなかった)
+- g++ ([clang++12.0.1とopencv4.5だと文字入れがうまくいかなかった](https://github.com/opencv/opencv/issues/20854))
 - opencv4
 - openmp
 - ttf-migu（デフォルトフォント　[いい感じに合成した](https://wiki.27coba.lt/technology/font)）
