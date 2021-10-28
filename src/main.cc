@@ -26,7 +26,7 @@ auto main(int argc, char** argv) -> int {
       "{font|/usr/share/fonts/TTF/migu-1c-regular.ttf|font path}");
 
   const cv::Size output_size(1920, 1080);
-  const filesystem::path font      = filesystem::path(parser.get<std::string>("font"));
+  const filesystem::path font_path = filesystem::path(parser.get<std::string>("font"));
   const filesystem::path input_dir = parser.get<std::string>("input");
   const filesystem::path out_dir   = filesystem::path(parser.get<std::string>("output"));
   const filesystem::path output_dir =
@@ -34,7 +34,7 @@ auto main(int argc, char** argv) -> int {
   const filesystem::path video_dir =
       out_dir.string() + "/" + filesystem::path("video/").string();
   std::cout << "inputdir: " << input_dir << ", output_dir: " << out_dir
-            << ", font: " << font.c_str() << std::endl;
+            << ", font: " << font_path.c_str() << std::endl;
 
   std::set<std::filesystem::path> resource_paths;
   const int tile_size = 9;
@@ -76,6 +76,13 @@ auto main(int argc, char** argv) -> int {
 
   std::cout << "update from " << update_index << " th block" << std::endl;
 
+  // fontをtmpfsへコピー
+  const filesystem::path tmp_dir("/tmp/vrc_photo_album/");
+  const filesystem::path tmp_font = tmp_dir.string() + font_path.filename().string();
+  std::cout << "copy" << font_path << " -> " << tmp_font << std::endl;
+  filesystem::create_directory(tmp_dir);
+  filesystem::copy_file(font_path, tmp_font);
+
 // 画像生成部分
 // ここを消すと内側が並列化されるので1ブロック生成時は消すと良い（いい方法ない？）
 #pragma omp parallel for
@@ -88,13 +95,13 @@ auto main(int argc, char** argv) -> int {
     for (int j = 0; j < images.size(); j++) {
       images[j] = cv::imread(*(std::next(it, j)));
     }
-    image_generator generator(output_size, font);
+    image_generator generator(output_size, tmp_font);
     generator.generate_tile(it, images, dsts[0]);
 
 #pragma omp parallel for
     for (int j = 0; j < images.size(); j++) {
       auto id = std::next(it, j);
-      image_generator generator(output_size, font);
+      image_generator generator(output_size, tmp_font);
       generator.generate_single(*id, images[j], dsts[j + 1]);
       // std::string log(std::string("") + "generate: " + output_dir.string() +
       //                 id->filename().string() + " -> " + output_dir.string() +
