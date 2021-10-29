@@ -81,7 +81,7 @@ auto main(int argc, char** argv) -> int {
   const filesystem::path tmp_font = tmp_dir.string() + font_path.filename().string();
   std::cout << "copy" << font_path << " -> " << tmp_font << std::endl;
   filesystem::create_directory(tmp_dir);
-  filesystem::copy_file(font_path, tmp_font);
+  filesystem::copy_file(font_path, tmp_font, filesystem::copy_options::update_existing);
 
 // 画像生成部分
 // ここを消すと内側が並列化されるので1ブロック生成時は消すと良い（いい方法ない？）
