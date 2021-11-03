@@ -49,9 +49,10 @@ auto main(int argc, char** argv) -> int {
 
   // 重複チェック
   hls_manager manager(video_dir.string() + "vrc_photo_album.m3u8");
-  int update_index = 0;
-  auto it          = resource_paths.begin();
-  auto segment_num = (resource_paths.size() + tile_size - 1) / tile_size;
+  int update_index  = 0;
+  auto it           = resource_paths.begin();
+  int resource_size = resource_paths.size();
+  int segment_num   = (resource_size + tile_size - 1) / tile_size;
   for (; update_index < segment_num;) {
     if (!manager.next_segment()) {
       break;
@@ -141,13 +142,14 @@ auto main(int argc, char** argv) -> int {
   std::stringstream m3index;
   auto path = resource_paths.begin();
   for (int i = 0; i < segment_num; i++, std::advance(path, tile_size)) {
-    auto end = std::next(path, bound_load(path, resource_paths.end(), tile_size) - 1);
+    int block_size = std::min(resource_size - tile_size * (segment_num - i - 1), tile_size);
+    auto end       = std::next(path, bound_load(path, resource_paths.end(), tile_size) - 1);
     m3index << boost::format("#v%06d,%s,%s\n") % i % filename_date(*path) % filename_date(*end);
     m3stream << boost::format(
                     "#EXT-X-DISCONTINUITY\n"
-                    "#EXTINF:10\n"
+                    "#EXTINF:%d\n"
                     "%06d%01d.ts\n") %
-                    (segment_num - i - 1) % 0;
+                    (block_size + 1) % (segment_num - i - 1) % 0;
   }
   m3stream << "#EXT-X-ENDLIST\n";
   auto start = std::chrono::system_clock::now();
