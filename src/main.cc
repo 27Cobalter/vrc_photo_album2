@@ -56,7 +56,7 @@ auto main(int argc, char** argv) -> int {
     if (!manager.next_segment()) {
       break;
     }
-    auto end = std::next(it, n_or_end(it, resource_paths.end(), tile_size) - 1);
+    auto end = std::next(it, bound_load(it, resource_paths.end(), tile_size) - 1);
     if (manager.compare_start(it->filename()) && manager.compare_end(end->filename())) {
       // std::cout << update_index << ". " << it->filename() << " - " << end->filename()
       //           << " is not changed." << std::endl;
@@ -89,7 +89,7 @@ auto main(int argc, char** argv) -> int {
   for (int i = update_index; i < segment_num; i++) {
     const int index = i * tile_size;
     auto it         = std::next(resource_paths.begin(), index);
-    std::vector<cv::Mat> images(n_or_end(it, resource_paths.end(), tile_size));
+    std::vector<cv::Mat> images(bound_load(it, resource_paths.end(), tile_size));
     std::vector<cv::Mat> dsts(images.size() + 1);
 #pragma omp parallel for
     for (int j = 0; j < images.size(); j++) {
@@ -141,7 +141,7 @@ auto main(int argc, char** argv) -> int {
   std::stringstream m3index;
   auto path = resource_paths.begin();
   for (int i = 0; i < segment_num; i++, std::advance(path, tile_size)) {
-    auto end = std::next(path, n_or_end(path, resource_paths.end(), tile_size) - 1);
+    auto end = std::next(path, bound_load(path, resource_paths.end(), tile_size) - 1);
     m3index << boost::format("#v%06d,%s,%s\n") % i % filename_date(*path) % filename_date(*end);
     m3stream << boost::format(
                     "#EXT-X-DISCONTINUITY\n"

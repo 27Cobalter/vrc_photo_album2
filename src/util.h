@@ -12,7 +12,7 @@ inline std::string filename_date(filesystem::path path) {
 }
 
 template <typename Iterator>
-inline int n_or_end(Iterator it, Iterator end, int n) {
+inline int bound_load(Iterator it, Iterator end, int n) {
   return std::min(static_cast<int>(std::distance(it, end)), n);
 }
 } // namespace vrc_photo_album2
