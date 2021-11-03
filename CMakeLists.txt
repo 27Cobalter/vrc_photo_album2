@@ -38,6 +38,11 @@ if(NOT EXISTS ${CMAKE_BINARY_DIR}/resources)
   file(COPY ${CMAKE_SOURCE_DIR}/resources DESTINATION ${CMAKE_BINARY_DIR})
 endif()
 
+if(NOT EXISTS ${CMAKE_BINARY_DIR}/blank.png)
+  message(STATUS "Copy blank.png")
+  file(COPY ${CMAKE_SOURCE_DIR}/resources/blank.png DESTINATION ${CMAKE_BINARY_DIR})
+endif()
+
 if(NOT EXISTS ${CMAKE_BINARY_DIR}/export/png)
   message(STATUS "Create export/png directory")
   file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/export/png)

@@ -49,10 +49,9 @@ auto main(int argc, char** argv) -> int {
 
   // 重複チェック
   hls_manager manager(video_dir.string() + "vrc_photo_album.m3u8");
-  int update_index  = 0;
-  auto it           = resource_paths.begin();
-  int resource_size = resource_paths.size();
-  int segment_num   = (resource_size + tile_size - 1) / tile_size;
+  int update_index = 0;
+  auto it          = resource_paths.begin();
+  int segment_num  = (resource_paths.size() + tile_size - 1) / tile_size;
   for (; update_index < segment_num;) {
     if (!manager.next_segment()) {
       break;
@@ -84,23 +83,27 @@ auto main(int argc, char** argv) -> int {
   filesystem::create_directory(tmp_dir);
   filesystem::copy_file(font_path, tmp_font, filesystem::copy_options::update_existing);
 
+  const filesystem::path blank_path = "./blank.png";
+  const cv::Mat blank_image         = cv::imread(blank_path);
+
 // 画像生成部分
 // ここを消すと内側が並列化されるので1ブロック生成時は消すと良い（いい方法ない？）
 #pragma omp parallel for
   for (int i = update_index; i < segment_num; i++) {
     const int index = i * tile_size;
     auto it         = std::next(resource_paths.begin(), index);
-    std::vector<cv::Mat> images(bound_load(it, resource_paths.end(), tile_size));
-    std::vector<cv::Mat> dsts(images.size() + 1);
+    int bound       = bound_load(it, resource_paths.end(), tile_size);
+    std::vector<cv::Mat> images(bound);
+    std::vector<cv::Mat> dsts(tile_size + 1);
 #pragma omp parallel for
-    for (int j = 0; j < images.size(); j++) {
+    for (int j = 0; j < bound; j++) {
       images[j] = cv::imread(*(std::next(it, j)));
     }
     image_generator generator(output_size, tmp_font);
     generator.generate_tile(it, images, dsts[0]);
 
 #pragma omp parallel for
-    for (int j = 0; j < images.size(); j++) {
+    for (int j = 0; j < bound; j++) {
       auto id = std::next(it, j);
       image_generator generator(output_size, tmp_font);
       generator.generate_single(*id, images[j], dsts[j + 1]);
@@ -108,6 +111,9 @@ auto main(int argc, char** argv) -> int {
       //                 id->filename().string() + " -> " + output_dir.string() +
       //                 (boost::format("img-%05d_%05d.png") % i % (j + 1)).str());
       // std::cout << log << std::endl;
+    }
+    for (int j = bound + 1; j < dsts.size(); j++) {
+      dsts[j] = blank_image;
     }
 
 #pragma omp parallel for
@@ -142,14 +148,13 @@ auto main(int argc, char** argv) -> int {
   std::stringstream m3index;
   auto path = resource_paths.begin();
   for (int i = 0; i < segment_num; i++, std::advance(path, tile_size)) {
-    int block_size = std::min(resource_size - tile_size * (segment_num - i - 1), tile_size);
-    auto end       = std::next(path, bound_load(path, resource_paths.end(), tile_size) - 1);
+    auto end = std::next(path, bound_load(path, resource_paths.end(), tile_size) - 1);
     m3index << boost::format("#v%06d,%s,%s\n") % i % filename_date(*path) % filename_date(*end);
     m3stream << boost::format(
                     "#EXT-X-DISCONTINUITY\n"
-                    "#EXTINF:%d\n"
+                    "#EXTINF:10\n"
                     "%06d%01d.ts\n") %
-                    (block_size + 1) % (segment_num - i - 1) % 0;
+                    (segment_num - i - 1) % 0;
   }
   m3stream << "#EXT-X-ENDLIST\n";
   auto start = std::chrono::system_clock::now();
