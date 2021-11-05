@@ -39,6 +39,7 @@ auto main(int argc, char** argv) -> int {
   std::set<std::filesystem::path> resource_paths;
   const int tile_size = 9;
 
+  auto start = std::chrono::system_clock::now();
   // パス取得部分
   for (const filesystem::directory_entry& x : filesystem::directory_iterator(input_dir)) {
     std::string path(x.path());
@@ -46,7 +47,12 @@ auto main(int argc, char** argv) -> int {
       resource_paths.insert(x.path());
     }
   }
+  auto end = std::chrono::system_clock::now();
+  std::cout << "get paths time:"
+            << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count()
+            << std::endl;
 
+  start = std::chrono::system_clock::now();
   // 重複チェック
   hls_manager manager(video_dir.string() + "vrc_photo_album.m3u8");
   int update_index = 0;
@@ -68,6 +74,10 @@ auto main(int argc, char** argv) -> int {
       break;
     }
   }
+  end = std::chrono::system_clock::now();
+  std::cout << "check update time:"
+            << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count()
+            << std::endl;
 
   if (update_index >= segment_num) {
     std::cout << "file not changed" << std::endl;
@@ -157,7 +167,7 @@ auto main(int argc, char** argv) -> int {
                     (segment_num - i - 1) % 0;
   }
   m3stream << "#EXT-X-ENDLIST\n";
-  auto start = std::chrono::system_clock::now();
+  start = std::chrono::system_clock::now();
 #define USE_FSTREAM
 #ifdef USE_FSTREAM
   // 今回のケースならfstreamのが早そう?
@@ -171,7 +181,7 @@ auto main(int argc, char** argv) -> int {
   std::fwrite(m3stream.str().c_str(), 1, m3stream.str().size(), fp);
   std::fclose(fp);
 #endif
-  auto end = std::chrono::system_clock::now();
+  end = std::chrono::system_clock::now();
   std::cout << "file write time:"
             << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count()
             << std::endl;
