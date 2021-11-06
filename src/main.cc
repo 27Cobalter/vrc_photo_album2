@@ -35,6 +35,7 @@ auto main(int argc, char** argv) -> int {
       out_dir.string() + "/" + filesystem::path("video/").string();
   std::cout << "inputdir: " << input_dir << ", output_dir: " << out_dir
             << ", font: " << font_path.c_str() << std::endl;
+  const filesystem::path tmp_dir("/tmp/vrc_photo_album/");
 
   std::set<std::filesystem::path> resource_paths;
   const int tile_size = 9;
@@ -54,7 +55,12 @@ auto main(int argc, char** argv) -> int {
 
   start = std::chrono::system_clock::now();
   // 重複チェック
-  hls_manager manager(video_dir.string() + "vrc_photo_album.m3u8");
+  filesystem::path read_meta_dir = video_dir;
+  if (filesystem::exists(tmp_dir.string() + "vrc_photo_album.m3u8")) {
+    std::cout << "tmp m3u8 found" << std::endl;
+    read_meta_dir = tmp_dir;
+  }
+  hls_manager manager(read_meta_dir.string() + "vrc_photo_album.m3u8");
   int update_index = 0;
   auto it          = resource_paths.begin();
   int segment_num  = (resource_paths.size() + tile_size - 1) / tile_size;
@@ -87,7 +93,6 @@ auto main(int argc, char** argv) -> int {
   std::cout << "update from " << update_index << " th block" << std::endl;
 
   // fontをtmpfsへコピー
-  const filesystem::path tmp_dir("/tmp/vrc_photo_album/");
   const filesystem::path tmp_font = tmp_dir.string() + font_path.filename().string();
   std::cout << "copy" << font_path << " -> " << tmp_font << std::endl;
   filesystem::create_directory(tmp_dir);
@@ -181,6 +186,8 @@ auto main(int argc, char** argv) -> int {
   std::fwrite(m3stream.str().c_str(), 1, m3stream.str().size(), fp);
   std::fclose(fp);
 #endif
+  ofs = std::ofstream(tmp_dir.string() + "vrc_photo_album.m3u8");
+  ofs << m3index.str();
   end = std::chrono::system_clock::now();
   std::cout << "file write time:"
             << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count()
