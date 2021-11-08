@@ -22,12 +22,12 @@ bool hls_manager::next_segment() {
       segment_.end   = "";
       return false;
     }
-    auto index_pos = m3index_tag.size();
+    const auto index_pos = m3index_tag.size();
     if (line.size() > index_pos && line.substr(0, index_pos) != m3index_tag) {
       continue;
     }
-    auto start_pos = line.find(",", index_pos);
-    auto end_pos   = line.find(",", start_pos + 1);
+    const auto start_pos = line.find(",", index_pos);
+    const auto end_pos   = line.find(",", start_pos + 1);
     if (start_pos != std::string::npos && end_pos != std::string::npos) {
       segment_.index = line.substr(index_pos, start_pos - index_pos);
       segment_.start = line.substr(start_pos + 1, end_pos - start_pos - 1);
