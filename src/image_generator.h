@@ -16,7 +16,7 @@ class image_generator {
 public:
   image_generator(const cv::Size output_size, const filesystem::path font);
   void generate_single(const filesystem::path& path, const cv::Mat& src, cv::Mat& dst);
-  void generate_tile(const std::set<filesystem::path>::iterator path,
+  void generate_tile(const std::vector<filesystem::path>::iterator path,
                      const std::vector<cv::Mat>& images, cv::Mat& dst);
 
 private:

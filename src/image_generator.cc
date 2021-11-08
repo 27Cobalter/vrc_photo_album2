@@ -41,7 +41,7 @@ void image_generator::generate_single(const filesystem::path& path, const cv::Ma
   cv::warpAffine(src, dst, affine, dst.size(), cv::INTER_LINEAR, cv::BORDER_TRANSPARENT);
 }
 
-void image_generator::generate_tile(const std::set<filesystem::path>::iterator path,
+void image_generator::generate_tile(const std::vector<filesystem::path>::iterator path,
                                     const std::vector<cv::Mat>& images, cv::Mat& dst) {
   dst = cv::Mat::zeros(output_size_, CV_8UC3);
 

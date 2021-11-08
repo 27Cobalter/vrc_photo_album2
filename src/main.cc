@@ -37,7 +37,7 @@ auto main(int argc, char** argv) -> int {
             << ", font: " << font_path.c_str() << std::endl;
   const filesystem::path tmp_dir("/tmp/vrc_photo_album/");
 
-  std::set<std::filesystem::path> resource_paths;
+  std::vector<std::filesystem::path> resource_paths;
   const int tile_size = 9;
 
   auto start = std::chrono::system_clock::now();
@@ -45,9 +45,10 @@ auto main(int argc, char** argv) -> int {
   for (const filesystem::directory_entry& x : filesystem::directory_iterator(input_dir)) {
     std::string path(x.path());
     if (path.substr(path.length() - 3) == "png") {
-      resource_paths.insert(x.path());
+      resource_paths.push_back(x.path());
     }
   }
+  std::sort(resource_paths.begin(), resource_paths.end());
   auto end = std::chrono::system_clock::now();
   std::cout << "get paths time:"
             << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count()
