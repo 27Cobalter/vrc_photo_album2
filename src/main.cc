@@ -26,16 +26,48 @@ auto main(int argc, char** argv) -> int {
       "{font|/usr/share/fonts/TTF/migu-1c-regular.ttf|font path}");
 
   const cv::Size output_size(1920, 1080);
-  const filesystem::path font_path = filesystem::path(parser.get<std::string>("font"));
-  const filesystem::path input_dir = parser.get<std::string>("input");
-  const filesystem::path out_dir   = filesystem::path(parser.get<std::string>("output"));
-  const filesystem::path output_dir =
-      out_dir.string() + "/" + filesystem::path("png/").string();
-  const filesystem::path video_dir =
-      out_dir.string() + "/" + filesystem::path("video/").string();
+  const filesystem::path font_path(parser.get<std::string>("font"));
+  const filesystem::path input_dir(parser.get<std::string>("input"));
+  const filesystem::path out_dir(parser.get<std::string>("output"));
+  const filesystem::path output_dir(out_dir.string() + "/" + filesystem::path("png/").string());
+  const filesystem::path video_dir(out_dir.string() + "/" +
+                                   filesystem::path("video/").string());
   std::cout << "inputdir: " << input_dir << ", output_dir: " << out_dir
             << ", font: " << font_path.c_str() << std::endl;
-  const filesystem::path tmp_dir("/tmp/vrc_photo_album/");
+  const filesystem::path tmp_dir(filesystem::temp_directory_path().string() +
+                                 "/vrc_photo_album/");
+  const filesystem::path m3u8_name("vrc_photo_album.m3u8");
+
+  filesystem::path video_file = video_dir.string() + m3u8_name.string();
+  filesystem::path tmp_file   = tmp_dir.string() + m3u8_name.string();
+
+  auto input_time = filesystem::last_write_time(input_dir);
+  auto input_tm   = conv_fclock(input_time);
+  std::cout << "inputdir last write: " << std::put_time(&input_tm, "%c") << std::endl;
+
+  filesystem::create_directory(tmp_dir);
+
+  filesystem::path* read_meta_file = &video_file;
+  if (filesystem::exists(tmp_file)) {
+    std::cout << "tmp m3u8 found" << std::endl;
+    read_meta_file = &tmp_file;
+  } else {
+    std::cout << "tmp m3u8 not found" << std::endl;
+    filesystem::copy_file(video_file, tmp_file, filesystem::copy_options::update_existing);
+    filesystem::last_write_time(tmp_dir.string() + m3u8_name.string(), input_time);
+  }
+
+  if (filesystem::exists(*read_meta_file)) {
+    auto checker_time = filesystem::last_write_time(*read_meta_file);
+    auto checker_tm   = conv_fclock(checker_time);
+    std::cout << "checker last write: " << std::put_time(&checker_tm, "%c") << std::endl;
+    if (input_time == checker_time) {
+      std::cout << "inputdir not changed!" << std::endl;
+      return 0;
+    } else {
+      std::cout << "inputdir changed!" << std::endl;
+    }
+  }
 
   std::vector<std::filesystem::path> resource_paths;
   const int tile_size = 9;
@@ -56,12 +88,7 @@ auto main(int argc, char** argv) -> int {
 
   start = std::chrono::system_clock::now();
   // 重複チェック
-  filesystem::path read_meta_dir = video_dir;
-  if (filesystem::exists(tmp_dir.string() + "vrc_photo_album.m3u8")) {
-    std::cout << "tmp m3u8 found" << std::endl;
-    read_meta_dir = tmp_dir;
-  }
-  hls_manager manager(read_meta_dir.string() + "vrc_photo_album.m3u8");
+  hls_manager manager(*read_meta_file);
   int update_index = 0;
   auto it          = resource_paths.begin();
   int segment_num  = (resource_paths.size() + tile_size - 1) / tile_size;
@@ -88,6 +115,8 @@ auto main(int argc, char** argv) -> int {
 
   if (update_index >= segment_num) {
     std::cout << "file not changed" << std::endl;
+    filesystem::last_write_time(video_dir.string() + m3u8_name.string(), input_time);
+    filesystem::last_write_time(tmp_dir.string() + m3u8_name.string(), input_time);
     return 0;
   }
 
@@ -96,7 +125,6 @@ auto main(int argc, char** argv) -> int {
   // fontをtmpfsへコピー
   const filesystem::path tmp_font = tmp_dir.string() + font_path.filename().string();
   std::cout << "copy" << font_path << " -> " << tmp_font << std::endl;
-  filesystem::create_directory(tmp_dir);
   filesystem::copy_file(font_path, tmp_font, filesystem::copy_options::update_existing);
 
   const filesystem::path blank_path = "./blank.png";
@@ -174,25 +202,20 @@ auto main(int argc, char** argv) -> int {
   }
   m3stream << "#EXT-X-ENDLIST\n";
   start = std::chrono::system_clock::now();
-#define USE_FSTREAM
-#ifdef USE_FSTREAM
-  // 今回のケースならfstreamのが早そう?
-  std::ofstream ofs(video_dir.string() + "vrc_photo_album.m3u8");
+  std::ofstream ofs(video_dir.string() + m3u8_name.string());
   ofs << m3head << m3index.str() << m3stream.str();
-#else
-  auto fp = std::fopen((video_dir.string() + "vrc_photo_album.m3u8").c_str(), "w");
-  std::setvbuf(fp, NULL, _IOFBF, 512 * 1024);
-  std::fwrite(m3head.c_str(), 1, m3head.size(), fp);
-  std::fwrite(m3index.str().c_str(), 1, m3index.str().size(), fp);
-  std::fwrite(m3stream.str().c_str(), 1, m3stream.str().size(), fp);
-  std::fclose(fp);
-#endif
-  ofs = std::ofstream(tmp_dir.string() + "vrc_photo_album.m3u8");
+  ofs.close();
+  ofs = std::ofstream(tmp_dir.string() + m3u8_name.string());
   ofs << m3index.str();
   end = std::chrono::system_clock::now();
   std::cout << "file write time:"
             << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count()
             << std::endl;
+  ofs.close();
+
+  filesystem::last_write_time(video_dir.string() + m3u8_name.string(), input_time);
+  filesystem::last_write_time(tmp_dir.string() + m3u8_name.string(), input_time);
+
   std::cout << "complete!" << std::endl;
 
   return 0;
