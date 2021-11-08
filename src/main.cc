@@ -43,10 +43,10 @@ auto main(int argc, char** argv) -> int {
 
   auto input_time = filesystem::last_write_time(input_dir);
   auto input_tm   = conv_fclock(input_time);
-  std::cout << "inputdir last write: " << std::put_time(&input_tm, "%c") << std::endl;
 
   filesystem::create_directory(tmp_dir);
 
+  // tmpファイルの存在確認
   filesystem::path* read_meta_file = &video_file;
   if (filesystem::exists(tmp_file)) {
     std::cout << "tmp m3u8 found" << std::endl;
@@ -54,13 +54,15 @@ auto main(int argc, char** argv) -> int {
   } else {
     std::cout << "tmp m3u8 not found" << std::endl;
     filesystem::copy_file(video_file, tmp_file, filesystem::copy_options::update_existing);
-    filesystem::last_write_time(tmp_dir.string() + m3u8_name.string(), input_time);
+    filesystem::last_write_time(tmp_file, input_time);
   }
 
+  // m3u8が存在したら更新日時を確認
   if (filesystem::exists(*read_meta_file)) {
     auto checker_time = filesystem::last_write_time(*read_meta_file);
     auto checker_tm   = conv_fclock(checker_time);
-    std::cout << "checker last write: " << std::put_time(&checker_tm, "%c") << std::endl;
+    std::cout << "inputdir time: " << std::put_time(&input_tm, "%c")
+              << " checker time: " << std::put_time(&checker_tm, "%c") << std::endl;
     if (input_time == checker_time) {
       std::cout << "inputdir not changed!" << std::endl;
       return 0;
@@ -72,8 +74,8 @@ auto main(int argc, char** argv) -> int {
   std::vector<std::filesystem::path> resource_paths;
   const int tile_size = 9;
 
-  auto start = std::chrono::system_clock::now();
   // パス取得部分
+  auto start = std::chrono::system_clock::now();
   for (const filesystem::directory_entry& x : filesystem::directory_iterator(input_dir)) {
     std::string path(x.path());
     if (path.substr(path.length() - 3) == "png") {
@@ -86,8 +88,8 @@ auto main(int argc, char** argv) -> int {
             << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count()
             << std::endl;
 
-  start = std::chrono::system_clock::now();
   // 重複チェック
+  start = std::chrono::system_clock::now();
   hls_manager manager(*read_meta_file);
   int update_index = 0;
   auto it          = resource_paths.begin();
@@ -113,10 +115,11 @@ auto main(int argc, char** argv) -> int {
             << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count()
             << std::endl;
 
+  // ファイルの更新なしの場合
   if (update_index >= segment_num) {
     std::cout << "file not changed" << std::endl;
-    filesystem::last_write_time(video_dir.string() + m3u8_name.string(), input_time);
-    filesystem::last_write_time(tmp_dir.string() + m3u8_name.string(), input_time);
+    filesystem::last_write_time(video_file, input_time);
+    filesystem::last_write_time(tmp_file, input_time);
     return 0;
   }
 
@@ -201,11 +204,15 @@ auto main(int argc, char** argv) -> int {
                     (segment_num - i - 1) % 0;
   }
   m3stream << "#EXT-X-ENDLIST\n";
+
+  // 実体書き込み
   start = std::chrono::system_clock::now();
-  std::ofstream ofs(video_dir.string() + m3u8_name.string());
+  std::ofstream ofs(video_file);
   ofs << m3head << m3index.str() << m3stream.str();
   ofs.close();
-  ofs = std::ofstream(tmp_dir.string() + m3u8_name.string());
+
+  // tmpファイル書き込み
+  ofs = std::ofstream(tmp_file);
   ofs << m3index.str();
   end = std::chrono::system_clock::now();
   std::cout << "file write time:"
@@ -213,8 +220,8 @@ auto main(int argc, char** argv) -> int {
             << std::endl;
   ofs.close();
 
-  filesystem::last_write_time(video_dir.string() + m3u8_name.string(), input_time);
-  filesystem::last_write_time(tmp_dir.string() + m3u8_name.string(), input_time);
+  filesystem::last_write_time(video_file, input_time);
+  filesystem::last_write_time(tmp_file, input_time);
 
   std::cout << "complete!" << std::endl;
 
