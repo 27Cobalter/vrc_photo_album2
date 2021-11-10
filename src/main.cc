@@ -53,7 +53,7 @@ auto main(int argc, char** argv) -> int {
     if (filesystem::exists(tmp_file)) {
       std::cout << "tmp m3u8 found" << std::endl;
       read_meta_file = &tmp_file;
-    } else {
+    } else if (filesystem::exists(video_file)) {
       std::cout << "tmp m3u8 not found" << std::endl;
       filesystem::copy_file(video_file, tmp_file, filesystem::copy_options::update_existing);
       filesystem::last_write_time(tmp_file, input_time);
