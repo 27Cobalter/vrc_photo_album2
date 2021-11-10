@@ -155,14 +155,17 @@ auto main(int argc, char** argv) -> int {
       for (int j = 0; j < bound; j++) {
         auto id = std::next(it, j);
         image_generator generator(output_size, tmp_font);
-        generator.generate_single(*id, images[j], dsts[j + 1]);
+        // tile_size - jで新しいファイルからjで昔のファイルから (1)
+        generator.generate_single(*id, images[j], dsts[(tile_size - 1) - j + 1]);
         // std::string log(std::string("") + "generate: " + output_dir.string() +
         //                 id->filename().string() + " -> " + output_dir.string() +
         //                 (boost::format("img-%05d_%05d.png") % i % (j + 1)).str());
         // std::cout << log << std::endl;
       }
+      // for (int j = bound + 1; j < dsts.size(); j++) {
       for (int j = bound + 1; j < dsts.size(); j++) {
-        dsts[j] = blank_image;
+        // tile_size - jで新しいファイルからjで昔のファイルから (2)
+        dsts[tile_size - j + 1] = blank_image;
       }
 
 #pragma omp parallel for
