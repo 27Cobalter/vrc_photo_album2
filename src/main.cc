@@ -41,6 +41,18 @@ auto main(int argc, char** argv) -> int {
   filesystem::path video_file = video_dir.string() + m3u8_name.string();
   filesystem::path tmp_file   = tmp_dir.string() + m3u8_name.string();
 
+  if (!filesystem::exists(video_dir.string() + "dummy.m3u8")) {
+    std::string command = (boost::format("ffmpeg -loglevel error -framerate 0.1 "
+                                         "-i blank.png -vcodec libx264 "
+                                         "-pix_fmt yuv420p -r 5 -f hls -hls_time 10 "
+                                         "-hls_playlist_type vod -hls_segment_filename "
+                                         "\"%sdummy%s.ts\" %sdummy.m3u8") %
+                           video_dir.string() % "%1d" % video_dir.string())
+                              .str();
+    std::cout << command << std::endl;
+    std::system(command.c_str());
+  }
+
   // プログラム実行中に入力が更新されたらやり直し
   for (;;) {
     auto input_time = filesystem::last_write_time(input_dir);
@@ -196,26 +208,44 @@ auto main(int argc, char** argv) -> int {
         "#EXT-X-TARGETDURATION:10\n"
         "#EXT-X-MEDIA-SEQUENCE:0\n"
         "#EXT-X-PLAYLIST-TYPE:EVENT\n\n"};
+    const std::string m3tail = {"#EXT-X-ENDLIST\n"};
     std::stringstream m3stream;
     std::stringstream m3index;
-    auto path = resource_paths.begin();
+    auto path                = resource_paths.begin();
+    constexpr int block_size = 360;
+    const int block_num      = (segment_num + block_size - 1) / block_size;
+    std::vector<std::stringstream> m3block(block_num);
     for (int i = 0; i < segment_num; i++, std::advance(path, tile_size)) {
       auto end = std::next(path, bound_load(path, resource_paths.end(), tile_size) - 1);
       m3index << boost::format("#v%06d,%s,%s\n") % i % filename_date(*path) %
                      filename_date(*end);
-      m3stream << boost::format(
-                      "#EXT-X-DISCONTINUITY\n"
-                      "#EXTINF:10\n"
-                      "%06d%01d.ts\n") %
-                      (segment_num - i - 1) % 0;
+      std::string segment_data = (boost::format("#EXT-X-DISCONTINUITY\n"
+                                                "#EXTINF:10\n"
+                                                "%06d%01d.ts\n") %
+                                  (segment_num - i - 1) % 0)
+                                     .str();
+      m3stream << segment_data;
+      m3block[i / block_size] << segment_data;
     }
-    m3stream << "#EXT-X-ENDLIST\n";
 
     // 実体書き込み
     start = std::chrono::system_clock::now();
     std::ofstream ofs(video_file);
-    ofs << m3head << m3index.str() << m3stream.str();
+    ofs << m3head << m3index.str() << m3stream.str() << m3tail;
     ofs.close();
+    // block_sizeごとに分けたm3u8
+#pragma omp parallel for
+    for (int i = 0; i < block_num; i++) {
+      std::ofstream ofs(video_dir.string() +
+                        (boost::format("vrc_photo_album%03d.m3u8") % i).str());
+      if (i != block_num - 1) {
+        m3block[i] << "#EXT-X-DISCONTINUITY\n"
+                      "#EXTINF:10\n"
+                      "dummy0.ts\n";
+      }
+      ofs << m3head << m3block[i].str() << m3tail;
+      ofs.close();
+    }
 
     // tmpファイル書き込み
     ofs = std::ofstream(tmp_file);
