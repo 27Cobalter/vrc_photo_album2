@@ -42,9 +42,9 @@ auto main(int argc, char** argv) -> int {
   filesystem::path tmp_file   = tmp_dir.string() + m3u8_name.string();
 
   if (!filesystem::exists(video_dir.string() + "dummy.m3u8")) {
-    std::string command = (boost::format("ffmpeg -loglevel error -framerate 0.1 "
+    std::string command = (boost::format("ffmpeg -loglevel error -loop 1 -framerate 1 "
                                          "-i blank.png -vcodec libx264 "
-                                         "-pix_fmt yuv420p -r 5 -f hls -hls_time 10 "
+                                         "-pix_fmt yuv420p -r 5 -f hls -hls_time 10 -t 9 "
                                          "-hls_playlist_type vod -hls_segment_filename "
                                          "\"%sdummy%s.ts\" %sdummy.m3u8") %
                            video_dir.string() % "%1d" % video_dir.string())
@@ -240,7 +240,7 @@ auto main(int argc, char** argv) -> int {
                         (boost::format("vrc_photo_album%03d.m3u8") % i).str());
       if (i != block_num - 1) {
         m3block[i] << "#EXT-X-DISCONTINUITY\n"
-                      "#EXTINF:10\n"
+                      "#EXTINF:9\n"
                       "dummy0.ts\n";
       }
       ofs << m3head << m3block[i].str() << m3tail;
