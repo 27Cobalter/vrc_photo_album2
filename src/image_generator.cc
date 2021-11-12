@@ -53,15 +53,19 @@ void image_generator::generate_tile(const std::vector<filesystem::path>::iterato
   int i        = 8;
   auto path_it = path;
   for (auto image_it = images.begin(); image_it != images.end(); image_it++, i--, path_it++) {
-    const double scale = (static_cast<double>(dst.rows) / image_it->rows) / tile_width;
-    const int dx_tmp   = (dx - image_it->cols * scale) / 2;
-    const int mx       = dx * std::floor(i % tile_width) + dx_tmp;
-    const int my       = dy * (i / tile_width);
-    cv::Mat affine     = (cv::Mat_<double>(2, 3) << scale, 0, mx, 0, scale, my);
+    constexpr float aspecto16x9 = 16 / 9;
+    double scale                = (static_cast<double>(dst.rows) / image_it->rows) / tile_width;
+    if ((static_cast<double>(image_it->cols) / image_it->rows) - aspecto16x9 > 0.001)
+      scale = (static_cast<double>(dst.cols) / image_it->cols) / tile_width;
+    const int dx_tmp = (dx - image_it->cols * scale) / 2;
+    const int dy_tmp = (dy - image_it->rows * scale) / 2;
+    const int mx     = dx * std::floor(i % tile_width) + dx_tmp;
+    const int my     = dy * (i / tile_width);
+    cv::Mat affine   = (cv::Mat_<double>(2, 3) << scale, 0, mx, 0, scale, my + dy_tmp);
     cv::warpAffine(*image_it, dst, affine, dst.size(), cv::INTER_LINEAR,
                    cv::BORDER_TRANSPARENT);
     const cv::Point date_pos =
-        cv::Point(mx, my + (output_size_.height * (picture_ratio_ + 0.1)) / 3);
+        cv::Point(mx, my - dy_tmp + (output_size_.height * (picture_ratio_ + 0.1)) / 3);
     std::string filename = filename_date(*path_it);
     filename[10]         = ' ';
     filename[13]         = ':';
