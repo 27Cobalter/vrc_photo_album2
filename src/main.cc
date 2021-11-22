@@ -92,13 +92,16 @@ auto main(int argc, char** argv) -> int {
 
     // パス取得部分
     auto start = std::chrono::system_clock::now();
-    for (const filesystem::directory_entry& x : filesystem::directory_iterator(input_dir)) {
+    for (const filesystem::directory_entry& x :
+         filesystem::recursive_directory_iterator(input_dir)) {
       std::string path(x.path());
       if (path.substr(path.length() - 3) == "png") {
         resource_paths.push_back(x.path());
       }
     }
-    std::sort(resource_paths.begin(), resource_paths.end());
+    std::sort(resource_paths.begin(), resource_paths.end(),
+              [](auto a, auto b) { return a.filename() < b.filename(); });
+
     auto end = std::chrono::system_clock::now();
     std::cout << "get paths time:"
               << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count()
