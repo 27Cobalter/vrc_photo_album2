@@ -8,7 +8,7 @@
 - g++ ([clang++12.0.1とopencv4.5だと文字入れがうまくいかなかった](https://github.com/opencv/opencv/issues/20854))
 - opencv4
 - openmp
-- ttf-migu（デフォルトフォント　[いい感じに合成した](https://wiki.27coba.lt/technology/font)）
+- ttf-migu（デフォルトフォント　こばルームで使ってるやつは[いい感じに合成した](https://wiki.27coba.lt/technology/font)）
 - ffmpeg (shellで実行できること)
 
 ## ビルド&実行
@@ -24,3 +24,4 @@ $ ./bin/vrc_photo_album2
 -  --input=/path/to/input_dir
 -  --output=/path/to/output_dir
 -  --font=/path/to/font_file
+-  --filepref=prefix
