@@ -23,7 +23,8 @@ auto main(int argc, char** argv) -> int {
       argc, argv,
       "{input|./resources|input directory}"
       "{output|./export|output directory. required sub folter output_dir/(png,video)/}"
-      "{font|/usr/share/fonts/TTF/migu-1c-regular.ttf|font path}");
+      "{font|/usr/share/fonts/TTF/migu-1c-regular.ttf|font path}"
+      "{filepref|vrc_photo_album|file prefix}");
 
   const cv::Size output_size(1920, 1080);
   const filesystem::path font_path(parser.get<std::string>("font"));
@@ -32,14 +33,15 @@ auto main(int argc, char** argv) -> int {
   const filesystem::path output_dir(out_dir.string() + "/" + filesystem::path("png/").string());
   const filesystem::path video_dir(out_dir.string() + "/" +
                                    filesystem::path("video/").string());
-  std::cout << "inputdir: " << input_dir << ", output_dir: " << out_dir
-            << ", font: " << font_path.c_str() << std::endl;
+  const std::string file_pref(parser.get<std::string>("filepref"));
+  const filesystem::path m3u8_file(file_pref + ".m3u8");
+  std::cout << "input_dir: " << input_dir << ", output_dir: " << out_dir
+            << ", m3u8_file: " << m3u8_file << ", font: " << font_path.c_str() << std::endl;
   const filesystem::path tmp_dir(filesystem::temp_directory_path().string() +
                                  "/vrc_photo_album/");
-  const filesystem::path m3u8_name("vrc_photo_album.m3u8");
 
-  filesystem::path video_file = video_dir.string() + m3u8_name.string();
-  filesystem::path tmp_file   = tmp_dir.string() + m3u8_name.string();
+  filesystem::path video_file = video_dir.string() + m3u8_file.string();
+  filesystem::path tmp_file   = tmp_dir.string() + m3u8_file.string();
 
   if (!filesystem::exists(video_dir.string() + "dummy.m3u8")) {
     std::string command = (boost::format("ffmpeg -loglevel error -loop 1 -framerate 1 "
@@ -182,19 +184,21 @@ auto main(int argc, char** argv) -> int {
 
 #pragma omp parallel for
       for (int j = 0; j < dsts.size(); j++) {
-        cv::imwrite(output_dir.string() + (boost::format("img-%06d_%05d.png") % i % (j)).str(),
-                    dsts[j]);
+        cv::imwrite(
+            (boost::format("%s_%s%06d_%05d.png") % output_dir.string() % file_pref % i % (j))
+                .str(),
+            dsts[j]);
         dsts[j].release();
       }
 
       // 10枚毎のブロック生成部分
       std::string command = (boost::format("ffmpeg -loglevel error -framerate 1 "
-                                           "-i %simg-%06d_%s.png -vcodec libx264 "
+                                           "-i %s_%s%06d_%s.png -vcodec libx264 "
                                            "-pix_fmt yuv420p -r 5 -f hls -hls_time 10 "
                                            "-hls_playlist_type vod -hls_segment_filename "
-                                           "\"%s%06d%s.ts\" %s%06d.m3u8") %
-                             output_dir.string() % i % "%05d" % video_dir.string() % i % "%1d" %
-                             video_dir.string() % i)
+                                           "\"%s_%s%06d%s.ts\" %s_%s%06d.m3u8") %
+                             output_dir.string() % file_pref % i % "%05d" % video_dir.string() %
+                             file_pref % i % "%1d" % video_dir.string() % file_pref % i)
                                 .str();
       std::cout << command << std::endl;
       std::system(command.c_str());
@@ -221,8 +225,8 @@ auto main(int argc, char** argv) -> int {
                      filename_date(*end);
       std::string segment_data = (boost::format("#EXT-X-DISCONTINUITY\n"
                                                 "#EXTINF:10\n"
-                                                "%06d%01d.ts\n") %
-                                  (segment_num - i - 1) % 0)
+                                                "_%s%06d%01d.ts\n") %
+                                  file_pref % (segment_num - i - 1) % 0)
                                      .str();
       m3stream << segment_data;
       m3block[i / block_size] << segment_data;
@@ -237,7 +241,7 @@ auto main(int argc, char** argv) -> int {
 #pragma omp parallel for
     for (int i = 0; i < block_num; i++) {
       std::ofstream ofs(video_dir.string() +
-                        (boost::format("vrc_photo_album%03d.m3u8") % i).str());
+                        (boost::format("%s%03d.m3u8") % file_pref % i).str());
       if (i != block_num - 1) {
         m3block[i] << "#EXT-X-DISCONTINUITY\n"
                       "#EXTINF:9\n"
