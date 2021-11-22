@@ -24,7 +24,7 @@ auto main(int argc, char** argv) -> int {
       "{input|./resources|input directory}"
       "{output|./export|output directory. required sub folter output_dir/(png,video)/}"
       "{font|/usr/share/fonts/TTF/migu-1c-regular.ttf|font path}"
-      "{modified|./resources|check modified dir}"
+      "{modified|.|check modified dir}"
       "{filepref|vrc_photo_album|file prefix}");
 
   const cv::Size output_size(1920, 1080);
@@ -34,11 +34,13 @@ auto main(int argc, char** argv) -> int {
   const filesystem::path output_dir(out_dir.string() + "/" + filesystem::path("png/").string());
   const filesystem::path video_dir(out_dir.string() + "/" +
                                    filesystem::path("video/").string());
-  const filesystem::path check_modified_dir(parser.get<std::string>("modified"));
+  const filesystem::path check_modified_dir(input_dir.string() + "/" +
+                                            parser.get<std::string>("modified"));
   const std::string file_pref(parser.get<std::string>("filepref"));
   const filesystem::path m3u8_file(file_pref + ".m3u8");
   std::cout << "input_dir: " << input_dir << ", output_dir: " << out_dir
-            << ", m3u8_file: " << m3u8_file << ", font: " << font_path.c_str() << std::endl;
+            << ", modified_dir: " << check_modified_dir << ", m3u8_file: " << m3u8_file
+            << ", font: " << font_path.c_str() << std::endl;
   const filesystem::path tmp_dir(filesystem::temp_directory_path().string() +
                                  "/vrc_photo_album/");
 
