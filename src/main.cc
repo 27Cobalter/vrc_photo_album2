@@ -24,6 +24,7 @@ auto main(int argc, char** argv) -> int {
       "{input|./resources|input directory}"
       "{output|./export|output directory. required sub folter output_dir/(png,video)/}"
       "{font|/usr/share/fonts/TTF/migu-1c-regular.ttf|font path}"
+      "{modified|./resources|check modified dir}"
       "{filepref|vrc_photo_album|file prefix}");
 
   const cv::Size output_size(1920, 1080);
@@ -33,6 +34,7 @@ auto main(int argc, char** argv) -> int {
   const filesystem::path output_dir(out_dir.string() + "/" + filesystem::path("png/").string());
   const filesystem::path video_dir(out_dir.string() + "/" +
                                    filesystem::path("video/").string());
+  const filesystem::path check_modified_dir(parser.get<std::string>("modified"));
   const std::string file_pref(parser.get<std::string>("filepref"));
   const filesystem::path m3u8_file(file_pref + ".m3u8");
   std::cout << "input_dir: " << input_dir << ", output_dir: " << out_dir
@@ -57,7 +59,7 @@ auto main(int argc, char** argv) -> int {
 
   // プログラム実行中に入力が更新されたらやり直し
   for (;;) {
-    auto input_time = filesystem::last_write_time(input_dir);
+    auto input_time = filesystem::last_write_time(check_modified_dir);
     auto input_tm   = conv_fclock(input_time);
 
     filesystem::create_directory(tmp_dir);

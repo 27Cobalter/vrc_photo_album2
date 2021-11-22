@@ -23,5 +23,6 @@ $ ./bin/vrc_photo_album2
 ## 実行オプション
 -  --input=/path/to/input_dir
 -  --output=/path/to/output_dir
+-  --modified=/path/to/modified_dir
 -  --font=/path/to/font_file
 -  --filepref=prefix
