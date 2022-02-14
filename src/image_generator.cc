@@ -16,7 +16,7 @@ image_generator::image_generator(const cv::Size output_size, const filesystem::p
   tmp_size_       = output_size_.height * ((1 - picture_ratio_) / 2);
   text_size_      = freetype2_->getTextSize("y()|", tmp_size_, thickness_, 0).height;
   font_size_      = tmp_size_ * text_size_ / tmp_size_;
-  user_font_size_ = font_size_ >> 1;
+  user_font_size_ = font_size_ >> 2;
 }
 
 void image_generator::generate_single(const filesystem::path& path, const cv::Mat& src,

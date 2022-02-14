@@ -158,7 +158,7 @@ auto main(int argc, char** argv) -> int {
 
 // 画像生成部分
 // ここを消すと内側が並列化されるので1ブロック生成時は消すと良い（いい方法ない？）
-#pragma omp parallel for
+// #pragma omp parallel for
     for (int i = update_index; i < segment_num; i++) {
       const int index = i * tile_size;
       auto it         = std::next(resource_paths.begin(), index);
@@ -223,7 +223,7 @@ auto main(int argc, char** argv) -> int {
     std::stringstream m3stream;
     std::stringstream m3index;
     auto path                = resource_paths.begin();
-    constexpr int block_size = 360;
+    constexpr int block_size = 180;
     const int block_num      = (segment_num + block_size - 1) / block_size;
     std::vector<std::stringstream> m3block(block_num);
     for (int i = 0; i < segment_num; i++, std::advance(path, tile_size)) {
