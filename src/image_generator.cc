@@ -16,7 +16,7 @@ image_generator::image_generator(const cv::Size output_size, const filesystem::p
   tmp_size_       = output_size_.height * ((1 - picture_ratio_) / 2);
   text_size_      = freetype2_->getTextSize("y()|", tmp_size_, thickness_, 0).height;
   font_size_      = tmp_size_ * text_size_ / tmp_size_;
-  user_font_size_ = font_size_ >> 2;
+  user_font_size_ = font_size_ >> 1;
 }
 
 void image_generator::generate_single(const filesystem::path& path, const cv::Mat& src,
@@ -90,9 +90,14 @@ void image_generator::put_metadata(meta_tool::meta_tool& metadata, cv::Mat& dst)
   }
   if (metadata.has_users()) {
     int i = 0;
+    const int user_size = metadata.users().size();
+    double font_size = user_font_size_;
+    if(user_size > 24){
+      font_size *= 24.0 / static_cast<double>(user_size);
+    }
     for (auto [user_name, screen_name] : metadata.users()) {
-      freetype2_->putText(dst, user_name, user_pos + cv::Point(0, user_font_size_ * i++),
-                          user_font_size_, text_color_, thickness_ / 2, cv::LINE_AA, false);
+      freetype2_->putText(dst, user_name, user_pos + cv::Point(0, font_size * i++),
+                          font_size, text_color_, thickness_ / 2, cv::LINE_AA, false);
     }
   }
 }
