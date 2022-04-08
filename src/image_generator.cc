@@ -53,15 +53,15 @@ void image_generator::generate_tile(const std::vector<filesystem::path>::iterato
   int i        = 8;
   auto path_it = path;
   for (auto image_it = images.begin(); image_it != images.end(); image_it++, i--, path_it++) {
-    constexpr float aspecto16x9 = 16 / 9;
+    constexpr float aspecto16x9 = 16.0 / 9;
     double scale                = (static_cast<double>(dst.rows) / image_it->rows) / tile_width;
-    if ((static_cast<double>(image_it->cols) / image_it->rows) - aspecto16x9 > 0.001)
+    if ((static_cast<double>(image_it->cols) / image_it->rows) > aspecto16x9)
       scale = (static_cast<double>(dst.cols) / image_it->cols) / tile_width;
     const int dx_tmp = (dx - image_it->cols * scale) / 2;
     const int dy_tmp = (dy - image_it->rows * scale) / 2;
-    const int mx     = dx * std::floor(i % tile_width) + dx_tmp;
+    const int mx     = dx * std::floor(i % tile_width);
     const int my     = dy * (i / tile_width);
-    cv::Mat affine   = (cv::Mat_<double>(2, 3) << scale, 0, mx, 0, scale, my + dy_tmp);
+    cv::Mat affine   = (cv::Mat_<double>(2, 3) << scale, 0, mx + dx_tmp, 0, scale, my + dy_tmp);
     cv::warpAffine(*image_it, dst, affine, dst.size(), cv::INTER_LINEAR,
                    cv::BORDER_TRANSPARENT);
     const cv::Point date_pos =

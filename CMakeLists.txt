@@ -33,14 +33,15 @@ set(LINK_FLAGS "${LINK_FLAGS} -lboost_thread")
 
 include_directories(${PNG_INCLUDE_DIRS})
 
-if(NOT EXISTS ${CMAKE_BINARY_DIR}/resources)
-  message(STATUS "Copy resources directory")
-  file(COPY ${CMAKE_SOURCE_DIR}/resources DESTINATION ${CMAKE_BINARY_DIR})
-endif()
-
 if(NOT EXISTS ${CMAKE_BINARY_DIR}/blank.png)
   message(STATUS "Copy blank.png")
   file(COPY ${CMAKE_SOURCE_DIR}/resources/blank.png DESTINATION ${CMAKE_BINARY_DIR})
+endif()
+
+if(NOT EXISTS ${CMAKE_BINARY_DIR}/resources)
+  message(STATUS "Copy resources directory")
+  file(COPY ${CMAKE_SOURCE_DIR}/resources DESTINATION ${CMAKE_BINARY_DIR})
+  file(REMOVE ${CMAKE_BINARY_DIR}/resources/blank.png)
 endif()
 
 if(NOT EXISTS ${CMAKE_BINARY_DIR}/export/png)
