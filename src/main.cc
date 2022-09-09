@@ -104,9 +104,8 @@ auto main(int argc, char** argv) -> int {
         resource_paths.push_back(x.path());
       }
     }
-    std::sort(resource_paths.begin(), resource_paths.end(), [](auto a, auto b) {
-      return std::string(a.filename()).substr(17) < std::string(b.filename()).substr(17);
-    });
+    std::sort(resource_paths.begin(), resource_paths.end(),
+              [](auto a, auto b) { return a.filename() < b.filename(); });
 
     auto end = std::chrono::system_clock::now();
     std::cout << "get paths time:"
