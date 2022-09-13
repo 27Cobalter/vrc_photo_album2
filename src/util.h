@@ -9,7 +9,7 @@ namespace vrc_photo_album2 {
 namespace filesystem = std::filesystem;
 inline std::string filename_date(filesystem::path path) {
   // VRChat_CCCCxRRRR_YYYY-mm-dd_HH_MM-ss.SSS.pngを想定
-  return path.filename().string().substr(17, 23);
+  return path.filename().string().substr(7, 23);
 }
 
 template <typename Iterator>
