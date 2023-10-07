@@ -1,4 +1,5 @@
 #include <cstdio>
+#include <thread>
 #include <chrono>
 #include <filesystem>
 #include <fstream>
@@ -25,8 +26,10 @@ auto main(int argc, char** argv) -> int {
       "{output|./export|output directory. required sub folter output_dir/(png,video)/}"
       "{font|/usr/share/fonts/TTF/migu-1c-regular.ttf|font path}"
       "{modified|.|check modified dir}"
-      "{filepref|vrc_photo_album|file prefix}");
+      "{filepref|vrc_photo_album|file prefix}"
+      "{generate_half| |enable generate half size}");
 
+  const bool generate_half = parser.has("generate_half");
   const cv::Size output_size(1920, 1080);
   const filesystem::path font_path(parser.get<std::string>("font"));
   const filesystem::path input_dir(parser.get<std::string>("input"));
@@ -47,16 +50,28 @@ auto main(int argc, char** argv) -> int {
   filesystem::path video_file = video_dir.string() + m3u8_file.string();
   filesystem::path tmp_file   = tmp_dir.string() + m3u8_file.string();
 
+  std::vector<std::tuple<std::string, std::string>> generate_sizes;
+  generate_sizes.push_back(std::make_tuple(
+      "full", (boost::format("%dx%d") % output_size.width % output_size.height).str()));
+  if (generate_half) {
+    generate_sizes.push_back(std::make_tuple(
+        "half",
+        (boost::format("%dx%d") % (output_size.width / 2) % (output_size.height / 2)).str()));
+  }
+
   if (!filesystem::exists(video_dir.string() + "dummy.m3u8")) {
-    std::string command = (boost::format("ffmpeg -loglevel error -loop 1 -framerate 1 "
-                                         "-i blank.png -vcodec libx264 "
-                                         "-pix_fmt yuv420p -r 5 -f hls -hls_time 10 -t 10 "
-                                         "-hls_playlist_type vod -hls_segment_filename "
-                                         "\"%sdummy%s.ts\" %sdummy.m3u8") %
-                           video_dir.string() % "%1d" % video_dir.string())
-                              .str();
-    std::cout << command << std::endl;
-    std::system(command.c_str());
+    for (auto& [quality, size] : generate_sizes) {
+      std::string command =
+          (boost::format("ffmpeg -loglevel error -loop 1 -framerate 1 "
+                         "-i blank.png -vcodec libx264 "
+                         "-pix_fmt yuv420p -r 5 -f hls -hls_time 10 -t 10 "
+                         "-hls_playlist_type vod -hls_segment_filename "
+                         "\"%sdummy_%s_%s.ts\" -s %s %sdummy_%s.m3u8") %
+           video_dir.string() % quality % "%1d" % size % video_dir.string() % quality)
+              .str();
+      std::cout << command << std::endl;
+      std::system(command.c_str());
+    }
   }
 
   // プログラム実行中に入力が更新されたらやり直し
@@ -157,9 +172,9 @@ auto main(int argc, char** argv) -> int {
     const filesystem::path blank_path = "./blank.png";
     const cv::Mat blank_image         = cv::imread(blank_path);
 
-// 画像生成部分
-// ここを消すと内側が並列化されるので1ブロック生成時は消すと良い（いい方法ない？）
-// #pragma omp parallel for
+    // 画像生成部分
+    // ここを消すと内側が並列化されるので1ブロック生成時は消すと良い（いい方法ない？）
+    // #pragma omp parallel for
     for (int i = update_index; i < segment_num; i++) {
       const int index = i * tile_size;
       auto it         = std::next(resource_paths.begin(), index);
@@ -200,76 +215,92 @@ auto main(int argc, char** argv) -> int {
       }
 
       // 10枚毎のブロック生成部分
-      std::string command = (boost::format("ffmpeg -loglevel error -framerate 1 "
-                                           "-i %s_%s%06d_%s.png -vcodec libx264 "
-                                           "-pix_fmt yuv420p -r 5 -f hls -hls_time 10 "
-                                           "-hls_playlist_type vod -hls_segment_filename "
-                                           "\"%s_%s%06d%s.ts\" %s_%s%06d.m3u8") %
-                             output_dir.string() % file_pref % i % "%05d" % video_dir.string() %
-                             file_pref % i % "%1d" % video_dir.string() % file_pref % i)
-                                .str();
-      std::cout << command << std::endl;
-      std::system(command.c_str());
+      for (auto& [quality, size] : generate_sizes) {
+        std::string command =
+            (boost::format("ffmpeg -loglevel error -framerate 1 "
+                           "-i %s_%s%06d_%s.png -vcodec libx264 "
+                           "-pix_fmt yuv420p -r 5 -f hls -hls_time 10 "
+                           "-hls_playlist_type vod -hls_segment_filename "
+                           "\"%s_%s_%s_%06d_%s.ts\" -s %s %s_%s_%s_%06d.m3u8") %
+             output_dir.string() % file_pref % i % "%05d" % video_dir.string() %
+             file_pref % quality % i % "%1d" % size % video_dir.string() % file_pref % quality % i)
+                .str();
+        std::cout << command << std::endl;
+        std::system(command.c_str());
+      }
     }
 
     // hlsのメタデータ変更部分
-    std::cout << "writeing m3u8" << std::endl;
-    const std::string m3head = {
-        "#EXTM3U\n"
-        "#EXT-X-VERSION:3\n"
-        "#EXT-X-TARGETDURATION:10\n"
-        "#EXT-X-MEDIA-SEQUENCE:0\n"
-        "#EXT-X-PLAYLIST-TYPE:EVENT\n\n"};
-    const std::string m3tail = {"#EXT-X-ENDLIST\n"};
-    std::stringstream m3stream;
-    std::stringstream m3index;
-    auto path                = resource_paths.begin();
-    constexpr int block_size = 180;
-    const int block_num      = (segment_num + block_size - 1) / block_size;
-    std::vector<std::stringstream> m3block(block_num);
-    for (int i = 0; i < segment_num; i++, std::advance(path, tile_size)) {
-      auto end = std::next(path, bound_load(path, resource_paths.end(), tile_size) - 1);
-      m3index << boost::format("#v%06d,%s,%s\n") % i % filename_date(*path) %
-                     filename_date(*end);
-      std::string segment_data = (boost::format("#EXT-X-DISCONTINUITY\n"
-                                                "#EXTINF:10\n"
-                                                "_%s%06d%01d.ts\n") %
-                                  file_pref % (segment_num - i - 1) % 0)
-                                     .str();
-      m3stream << segment_data;
-      m3block[i / block_size] << segment_data;
-    }
-
-    // 実体書き込み
-    start = std::chrono::system_clock::now();
-    std::ofstream ofs(video_file);
-    ofs << m3head << m3index.str() << m3stream.str() << m3tail;
-    ofs.close();
-    // block_sizeごとに分けたm3u8
-#pragma omp parallel for
-    for (int i = 0; i < block_num; i++) {
-      std::ofstream ofs(video_dir.string() +
-                        (boost::format("%s%03d.m3u8") % file_pref % i).str());
-      for (int j = block_num - 1 - i; j > 0; j--) {
-        m3block[i] << "#EXT-X-DISCONTINUITY\n"
-                      "#EXTINF:10\n"
-                      "dummy0.ts\n";
+    auto generate_metadata = [&](std::string quality) {
+      std::cout << "writeing m3u8 " << quality << std::endl;
+      const std::string m3head = {
+          "#EXTM3U\n"
+          "#EXT-X-VERSION:3\n"
+          "#EXT-X-TARGETDURATION:10\n"
+          "#EXT-X-MEDIA-SEQUENCE:0\n"
+          "#EXT-X-PLAYLIST-TYPE:EVENT\n\n"};
+      const std::string m3tail = {"#EXT-X-ENDLIST\n"};
+      std::stringstream m3stream;
+      std::stringstream m3index;
+      auto path                = resource_paths.begin();
+      constexpr int block_size = 180;
+      const int block_num      = (segment_num + block_size - 1) / block_size;
+      std::vector<std::stringstream> m3block(block_num);
+      for (int i = 0; i < segment_num; i++, std::advance(path, tile_size)) {
+        auto end = std::next(path, bound_load(path, resource_paths.end(), tile_size) - 1);
+        m3index << boost::format("#v%06d,%s,%s\n") % i % filename_date(*path) %
+                       filename_date(*end);
+        std::string segment_data = (boost::format("#EXT-X-DISCONTINUITY\n"
+                                                  "#EXTINF:10\n"
+                                                  "_%s_%s_%06d_%01d.ts\n") %
+                                    file_pref % quality % (segment_num - i - 1) % 0)
+                                       .str();
+        m3stream << segment_data;
+        m3block[i / block_size] << segment_data;
       }
-      ofs << m3head << m3block[i].str() << m3tail;
+
+      // 実体書き込み
+      start = std::chrono::system_clock::now();
+      std::ofstream ofs;
+      if (quality == std::get<0>(generate_sizes[0])) {
+        ofs.open(video_file);
+        ofs << m3head << m3index.str() << m3stream.str() << m3tail;
+        ofs.close();
+      }
+      // block_sizeごとに分けたm3u8
+#pragma omp parallel for
+      for (int i = 0; i < block_num; i++) {
+        std::ofstream ofs(video_dir.string() +
+                          (boost::format("%s_%s_%03d.m3u8") % file_pref % quality % i).str());
+        for (int j = block_num - 1 - i; j > 0; j--) {
+          m3block[i] << "#EXT-X-DISCONTINUITY\n"
+                        "#EXTINF:10\n"
+                        "dummy_0.ts\n";
+        }
+        ofs << m3head << m3block[i].str() << m3tail;
+        ofs.close();
+      }
+
+      // tmpファイル書き込み
+      ofs = std::ofstream(tmp_file);
+      ofs << m3index.str();
+      end = std::chrono::system_clock::now();
+      std::cout << "file write time " << quality << ":"
+                << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count()
+                << std::endl;
       ofs.close();
+
+      filesystem::last_write_time(video_file, input_time);
+      filesystem::last_write_time(tmp_file, input_time);
+    };
+
+    std::vector<std::thread> threads;
+    for (auto& [quality, size] : generate_sizes) {
+      threads.push_back(std::thread(generate_metadata, quality));
     }
-
-    // tmpファイル書き込み
-    ofs = std::ofstream(tmp_file);
-    ofs << m3index.str();
-    end = std::chrono::system_clock::now();
-    std::cout << "file write time:"
-              << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count()
-              << std::endl;
-    ofs.close();
-
-    filesystem::last_write_time(video_file, input_time);
-    filesystem::last_write_time(tmp_file, input_time);
+    for (auto& elem : threads) {
+      elem.join();
+    }
 
     std::cout << "complete!" << std::endl;
   }
